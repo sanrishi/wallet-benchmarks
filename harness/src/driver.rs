@@ -1,4 +1,4 @@
-use crate::metrics::{ScanMetrics, ScenarioResult, TxMetrics};
+use crate::metrics::{ScanMetrics, TxMetrics};
 use async_trait::async_trait;
 
 #[async_trait]
