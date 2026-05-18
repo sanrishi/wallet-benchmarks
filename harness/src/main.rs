@@ -1,4 +1,5 @@
 mod config;
+mod driver;
 mod metrics;
 
 use std::fs::read_to_string;
