@@ -1,6 +1,7 @@
 use std::time::{Duration, Instant};
 
 use anyhow::anyhow;
+use futures::future::join_all;
 
 use crate::config::Config;
 use crate::driver::WalletDriver;
@@ -140,18 +141,56 @@ pub async fn run_s4(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
     let initial_balance = driver.get_balance().await?;
     let mut expected_balance = initial_balance;
     let mut tx_metrics = Vec::new();
+    let fee_rate = parse_fee_rate(config);
+    let per_tx_timeout = Duration::from_secs(config.s4_t_budget_secs);
 
     for batch_size in &config.concurrent_batches {
-        for index in 0..*batch_size {
-            let tx = attempt_send_single(
-                driver,
-                &synthetic_address(driver.mode_name(), "s4", (batch_size.saturating_mul(1000) + index) as usize),
-                1,
-                parse_fee_rate(config),
-            )
-            .await;
+        let futures = (0..*batch_size)
+            .map(|index| {
+                let address = synthetic_address(
+                    driver.mode_name(),
+                    "s4",
+                    (batch_size.saturating_mul(1000) + index) as usize,
+                );
+                async move {
+                    match tokio::time::timeout(
+                        per_tx_timeout,
+                        driver.send_single(&address, 1, fee_rate),
+                    )
+                    .await
+                    {
+                        Ok(Ok(tx)) => tx,
+                        Ok(Err(error)) => TxMetrics {
+                            tx_id: String::new(),
+                            construction_secs: 0.0,
+                            broadcast_to_mempool_secs: 0.0,
+                            broadcast_to_confirmed_secs: 0.0,
+                            fee_paid: 0,
+                            success: false,
+                            error: Some(error.to_string()),
+                        },
+                        Err(_) => TxMetrics {
+                            tx_id: String::new(),
+                            construction_secs: per_tx_timeout.as_secs_f64(),
+                            broadcast_to_mempool_secs: 0.0,
+                            broadcast_to_confirmed_secs: 0.0,
+                            fee_paid: 0,
+                            success: false,
+                            error: Some(format!(
+                                "send_single timed out after {}s",
+                                config.s4_t_budget_secs
+                            )),
+                        },
+                    }
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let batch_results = join_all(futures).await;
+        for tx in batch_results {
             if tx.success {
-                expected_balance = expected_balance.saturating_sub(1_u64.saturating_add(tx.fee_paid));
+                expected_balance =
+                    expected_balance.saturating_sub(1_u64.saturating_add(tx.fee_paid));
             }
             tx_metrics.push(tx);
         }
