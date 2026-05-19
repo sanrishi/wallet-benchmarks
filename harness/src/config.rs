@@ -1,6 +1,6 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
     pub a_fund: u64,
     pub c_min: u64,
@@ -14,4 +14,9 @@ pub struct Config {
     pub fee_rate: String,
     pub base_node_grpc_url: String,
     pub base_node_http_url: String,
+    pub wallet_bin_path: String,
+    pub old_wallet_data_dir: String,
+    pub new_wallet_data_dir: String,
+    pub payment_processor_data_dir: String,
+    pub grpc_port: u16,
 }
