@@ -1,8 +1,11 @@
 use std::path::PathBuf;
 use std::process::{Child, Command};
 use std::time::{Duration, Instant};
+
 use async_trait::async_trait;
 use anyhow::anyhow;
+use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
+
 use crate::driver::WalletDriver;
 use crate::metrics::{ScanMetrics, TxMetrics};
 
@@ -64,6 +67,82 @@ impl OldWalletDriver {
         }
         self.process = None;
     }
+
+    async fn scan_from_height(&self, from_height: u64) -> anyhow::Result<ScanMetrics> {
+        use tari_rpc::wallet_client::WalletClient;
+        use tari_rpc::RescanWalletRequest;
+
+        let h_tip_start = self.get_tip_height().await?;
+        let pid = self
+            .process
+            .as_ref()
+            .map(|child| Pid::from_u32(child.id()))
+            .ok_or_else(|| anyhow!("wallet process is not running"))?;
+
+        let mut client = WalletClient::connect(self.grpc_url.clone()).await?;
+        client
+            .rescan_wallet(RescanWalletRequest { from_height })
+            .await?;
+
+        let started_at = Instant::now();
+        let deadline = started_at + Duration::from_secs(1800);
+        let mut system = System::new_all();
+        let mut peak_rss_kb = 0_u64;
+        let mut peak_cpu_percent = 0.0_f64;
+        let mut h_tip_end = h_tip_start;
+        let mut last_height = None;
+        let mut stable_polls = 0_u8;
+
+        loop {
+            if Instant::now() > deadline {
+                return Err(anyhow!("wallet scan did not stabilize within 1800s"));
+            }
+
+            system.refresh_processes_specifics(
+                ProcessesToUpdate::Some(&[pid]),
+                false,
+                ProcessRefreshKind::nothing().with_memory().with_cpu(),
+            );
+            if let Some(process) = system.process(pid) {
+                peak_rss_kb = peak_rss_kb.max(process.memory());
+                peak_cpu_percent = peak_cpu_percent.max(process.cpu_usage() as f64);
+            }
+
+            let height = self.get_tip_height().await?;
+            h_tip_end = height;
+
+            if last_height == Some(height) {
+                stable_polls = stable_polls.saturating_add(1);
+            } else {
+                stable_polls = 0;
+                last_height = Some(height);
+            }
+
+            if stable_polls >= 3 {
+                break;
+            }
+
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+
+        let wall_clock_secs = started_at.elapsed().as_secs_f64();
+        let scanned_blocks = h_tip_end.saturating_sub(from_height);
+        let blocks_per_sec = if wall_clock_secs > 0.0 {
+            scanned_blocks as f64 / wall_clock_secs
+        } else {
+            0.0
+        };
+
+        Ok(ScanMetrics {
+            wall_clock_secs,
+            blocks_per_sec,
+            h_tip_start,
+            h_tip_end,
+            outputs_found: 0,
+            peak_rss_kb,
+            peak_cpu_percent,
+        })
+    }
 }
 
 #[async_trait]
@@ -79,27 +158,89 @@ impl WalletDriver for OldWalletDriver {
     }
 
     async fn get_balance(&self) -> anyhow::Result<u64> {
-        todo!("gRPC GetBalance not yet implemented")
+        use tari_rpc::GetBalanceRequest;
+        use tari_rpc::wallet_client::WalletClient;
+
+        let mut client = WalletClient::connect(self.grpc_url.clone()).await?;
+        let resp = client
+            .get_balance(GetBalanceRequest { payment_id: vec![] })
+            .await?
+            .into_inner();
+        Ok(resp.available_balance)
     }
 
     async fn get_tip_height(&self) -> anyhow::Result<u64> {
-        todo!("gRPC GetTipHeight not yet implemented")
+        use tari_rpc::GetStateRequest;
+        use tari_rpc::wallet_client::WalletClient;
+
+        let mut client = WalletClient::connect(self.grpc_url.clone()).await?;
+        let resp = client.get_state(GetStateRequest {}).await?.into_inner();
+        Ok(resp.scanned_height)
     }
 
     async fn scan_from_genesis(&self) -> anyhow::Result<ScanMetrics> {
-        todo!("scan_from_genesis not yet implemented")
+        self.scan_from_height(0).await
     }
 
-    async fn scan_from_birthday(&self, _height: u64) -> anyhow::Result<ScanMetrics> {
-        todo!("scan_from_birthday not yet implemented")
+    async fn scan_from_birthday(&self, height: u64) -> anyhow::Result<ScanMetrics> {
+        self.scan_from_height(height).await
     }
 
     async fn send_single(
         &self,
-        _to_address: &str,
-        _amount_ut: u64,
-        _fee_rate: u64,
+        to_address: &str,
+        amount_ut: u64,
+        fee_rate: u64,
     ) -> anyhow::Result<TxMetrics> {
-        todo!("send_single not yet implemented")
+        use tari_rpc::wallet_client::WalletClient;
+        use tari_rpc::{PaymentRecipient, TransferRequest};
+
+        let started_at = Instant::now();
+        let mut client = WalletClient::connect(self.grpc_url.clone()).await?;
+        let construction_finished_at = Instant::now();
+        let resp = client
+            .transfer(TransferRequest {
+                recipients: vec![PaymentRecipient {
+                    address: to_address.to_string(),
+                    amount: amount_ut,
+                    fee_per_gram: fee_rate,
+                    payment_type: tari_rpc::payment_recipient::PaymentType::StandardMimblewimble
+                        as i32,
+                    raw_payment_id: Vec::new(),
+                    user_payment_id: None,
+                }],
+                single_tx: true,
+            })
+            .await?
+            .into_inner();
+        let broadcast_finished_at = Instant::now();
+
+        let result = resp
+            .results
+            .into_iter()
+            .next()
+            .ok_or_else(|| anyhow!("transfer returned no results"))?;
+        let fee_paid = result
+            .transaction_info
+            .as_ref()
+            .map(|info| info.fee)
+            .unwrap_or(0);
+        let error = if result.is_success {
+            None
+        } else {
+            Some(result.failure_message.clone())
+        };
+
+        Ok(TxMetrics {
+            tx_id: result.transaction_id.to_string(),
+            construction_secs: construction_finished_at.duration_since(started_at).as_secs_f64(),
+            broadcast_to_mempool_secs: broadcast_finished_at
+                .duration_since(construction_finished_at)
+                .as_secs_f64(),
+            broadcast_to_confirmed_secs: 0.0,
+            fee_paid,
+            success: result.is_success,
+            error,
+        })
     }
 }
