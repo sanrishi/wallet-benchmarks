@@ -18,6 +18,16 @@ use metrics::BenchmarkReport;
 use scenarios::run_all_scenarios;
 use sysinfo::System;
 
+struct OldWalletGuard<'a> {
+    driver: &'a mut OldWalletDriver,
+}
+
+impl Drop for OldWalletGuard<'_> {
+    fn drop(&mut self) {
+        self.driver.stop();
+    }
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let config_path = std::env::args()
@@ -53,8 +63,10 @@ async fn main() -> anyhow::Result<()> {
         config.grpc_port,
     );
     old_wallet.start().await?;
-    let old_wallet_scenarios = run_all_scenarios(&old_wallet, &config).await?;
-    old_wallet.stop();
+    let old_wallet_scenarios = {
+        let guard = OldWalletGuard { driver: &mut old_wallet };
+        run_all_scenarios(&*guard.driver, &config).await?
+    };
     reports.push(BenchmarkReport {
         cpu_model: cpu_model.clone(),
         ram_kb,

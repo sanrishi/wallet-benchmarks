@@ -68,6 +68,14 @@ impl OldWalletDriver {
         self.process = None;
     }
 
+    async fn get_unspent_output_count(&self) -> anyhow::Result<u64> {
+        use tari_rpc::wallet_client::WalletClient;
+
+        let mut client = WalletClient::connect(self.grpc_url.clone()).await?;
+        let resp = client.get_unspent_amounts(tari_rpc::Empty {}).await?.into_inner();
+        Ok(resp.amount.len() as u64)
+    }
+
     async fn scan_from_height(&self, from_height: u64) -> anyhow::Result<ScanMetrics> {
         use tari_rpc::wallet_client::WalletClient;
         use tari_rpc::RescanWalletRequest;
@@ -127,6 +135,7 @@ impl OldWalletDriver {
 
         let wall_clock_secs = started_at.elapsed().as_secs_f64();
         let scanned_blocks = h_tip_end.saturating_sub(from_height);
+        let outputs_found = self.get_unspent_output_count().await?;
         let blocks_per_sec = if wall_clock_secs > 0.0 {
             scanned_blocks as f64 / wall_clock_secs
         } else {
@@ -138,7 +147,7 @@ impl OldWalletDriver {
             blocks_per_sec,
             h_tip_start,
             h_tip_end,
-            outputs_found: 0,
+            outputs_found,
             peak_rss_kb,
             peak_cpu_percent,
         })

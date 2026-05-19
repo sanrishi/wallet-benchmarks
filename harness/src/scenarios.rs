@@ -31,6 +31,7 @@ pub async fn run_b0(driver: &dyn WalletDriver) -> anyhow::Result<ScenarioResult>
 
 pub async fn run_s0(driver: &dyn WalletDriver, config: &Config) -> anyhow::Result<ScenarioResult> {
     let started_at = Instant::now();
+    let initial_balance = driver.get_balance().await?;
     let initial_tip = driver.get_tip_height().await?;
     let expected_tip = initial_tip.saturating_add(config.c_min);
     wait_for_tip_height(driver, expected_tip, Duration::from_secs(CONFIRMATION_TIMEOUT_SECS)).await?;
@@ -42,7 +43,7 @@ pub async fn run_s0(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
         total_fees: 0,
         success_count: 1,
         failure_count: 0,
-        balance_delta: observed_balance as i64 - observed_balance as i64,
+        balance_delta: observed_balance as i64 - initial_balance as i64,
         tx_metrics: Vec::new(),
         scan_metrics: None,
     })
