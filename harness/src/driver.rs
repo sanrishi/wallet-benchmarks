@@ -2,7 +2,7 @@ use crate::metrics::{ScanMetrics, TxMetrics};
 use async_trait::async_trait;
 
 #[async_trait]
-pub trait WalletDriver {
+pub trait WalletDriver: Sync {
     /// Return the wallet mode name e.g. "old_wallet", "new_wallet", "payment_processor"
     fn mode_name(&self) -> &str;
 
@@ -33,12 +33,9 @@ pub trait WalletDriver {
     /// Default impl returns an error so old/new wallet modes don't need to implement it.
     async fn send_batch(
         &self,
-        recipients: Vec<(String, u64)>,
-        fee_rate: u64,
+        _recipients: Vec<(String, u64)>,
+        _fee_rate: u64,
     ) -> anyhow::Result<TxMetrics> {
-        let _ = (recipients, fee_rate);
-        Err(anyhow::anyhow!(
-            "batch send not supported by this wallet mode"
-        ))
+        Err(anyhow::anyhow!("send_batch not supported by this driver"))
     }
 }

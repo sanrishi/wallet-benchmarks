@@ -163,7 +163,7 @@ impl WalletDriver for OldWalletDriver {
 
         let mut client = WalletClient::connect(self.grpc_url.clone()).await?;
         let resp = client
-            .get_balance(GetBalanceRequest { payment_id: vec![] })
+            .get_balance(GetBalanceRequest { payment_id: None })
             .await?
             .into_inner();
         Ok(resp.available_balance)

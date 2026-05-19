@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use anyhow::anyhow;
 use std::path::PathBuf;
 use crate::driver::WalletDriver;
 use crate::metrics::{ScanMetrics, TxMetrics};
@@ -54,8 +53,8 @@ impl WalletDriver for PaymentProcessorDriver {
 
     async fn send_batch(
         &self,
-        recipients: Vec<(String, u64)>,
-        fee_rate: u64,
+        _recipients: Vec<(String, u64)>,
+        _fee_rate: u64,
     ) -> anyhow::Result<TxMetrics> {
         todo!("payment_processor send_batch: 1-to-many transaction")
     }
