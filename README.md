@@ -25,6 +25,7 @@ Seed strategy: fresh seed per wallet mode.
 ## Running
 cargo build --release
 ./target/release/harness
+./target/release/harness --config /path/to/config.toml
 Results are written to `baseline_profile.json`.
 
 ## Output

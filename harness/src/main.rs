@@ -20,9 +20,11 @@ use sysinfo::System;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let config_path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("config.toml");
+    let config_path = std::env::args()
+        .skip_while(|a| a != "--config")
+        .nth(1)
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("config.toml"));
     let config_raw = read_to_string(&config_path)
         .with_context(|| format!("failed to read config from {}", config_path.display()))?;
     let config: Config = toml::from_str(&config_raw)
