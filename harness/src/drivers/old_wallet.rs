@@ -17,17 +17,19 @@ pub mod tari_rpc {
 pub struct OldWalletDriver {
     pub wallet_bin: PathBuf,      // path to minotari_console_wallet binary
     pub data_dir: PathBuf,        // wallet data directory (wiped on reset)
+    pub password: String,
     pub grpc_url: String,         // e.g. "http://127.0.0.1:18143"
     pub grpc_port: u16,
     process: Option<Child>,       // spawned wallet process
 }
 
 impl OldWalletDriver {
-    pub fn new(wallet_bin: PathBuf, data_dir: PathBuf, grpc_port: u16) -> Self {
+    pub fn new(wallet_bin: PathBuf, data_dir: PathBuf, password: String, grpc_port: u16) -> Self {
         let grpc_url = format!("http://127.0.0.1:{}", grpc_port);
         Self {
             wallet_bin,
             data_dir,
+            password,
             grpc_url,
             grpc_port,
             process: None,
@@ -40,6 +42,8 @@ impl OldWalletDriver {
             .arg("--grpc-enabled")
             .arg("--grpc-address")
             .arg(format!("/ip4/127.0.0.1/tcp/{}", self.grpc_port))
+            .arg("--password")
+            .arg(&self.password)
             .arg(format!("--base-path={}", self.data_dir.display()))
             .arg("--non-interactive-mode")
             .spawn()?;

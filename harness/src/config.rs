@@ -15,6 +15,7 @@ pub struct Config {
     pub base_node_grpc_url: String,
     pub base_node_http_url: String,
     pub wallet_bin_path: String,
+    pub old_wallet_password: String,
     pub old_wallet_data_dir: String,
     pub new_wallet_data_dir: String,
     pub payment_processor_data_dir: String,
