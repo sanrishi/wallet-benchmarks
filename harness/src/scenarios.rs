@@ -13,7 +13,6 @@ const CONFIRMATION_TIMEOUT_SECS: u64 = 300;
 
 pub async fn run_b0(driver: &dyn WalletDriver) -> anyhow::Result<ScenarioResult> {
     let started_at = Instant::now();
-    driver.reset().await?;
     let scan_metrics = driver.scan_from_genesis().await?;
     let observed_balance = driver.get_balance().await?;
 
@@ -142,7 +141,6 @@ pub async fn run_s1(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
 
 pub async fn run_s2(driver: &dyn WalletDriver) -> anyhow::Result<ScenarioResult> {
     let started_at = Instant::now();
-    driver.reset().await?;
     let scan_metrics = driver.scan_from_genesis().await?;
     let observed_balance = driver.get_balance().await?;
     let expected_balance = observed_balance;
@@ -163,7 +161,6 @@ pub async fn run_s2(driver: &dyn WalletDriver) -> anyhow::Result<ScenarioResult>
 
 pub async fn run_s3(driver: &dyn WalletDriver, h_birth: u64) -> anyhow::Result<ScenarioResult> {
     let started_at = Instant::now();
-    driver.reset().await?;
     let scan_metrics = driver.scan_from_birthday(h_birth).await?;
     let observed_balance = driver.get_balance().await?;
     let expected_balance = observed_balance;
@@ -309,7 +306,6 @@ pub async fn run_s5(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
 
 pub async fn run_s6(driver: &dyn WalletDriver) -> anyhow::Result<ScenarioResult> {
     let started_at = Instant::now();
-    driver.reset().await?;
     let scan_metrics = driver.scan_from_genesis().await?;
     let observed_balance = driver.get_balance().await?;
     let expected_balance = observed_balance;
@@ -328,7 +324,6 @@ pub async fn run_s6(driver: &dyn WalletDriver) -> anyhow::Result<ScenarioResult>
 
 pub async fn run_s7(driver: &dyn WalletDriver, h_birth: u64) -> anyhow::Result<ScenarioResult> {
     let started_at = Instant::now();
-    driver.reset().await?;
     let scan_metrics = driver.scan_from_birthday(h_birth).await?;
     let observed_balance = driver.get_balance().await?;
     let expected_balance = observed_balance;

@@ -30,7 +30,8 @@ async fn run_old_wallet_scenarios(
     old_wallet: &mut OldWalletDriver,
     config: &Config,
 ) -> anyhow::Result<Vec<ScenarioResult>> {
-    old_wallet.start().await?;
+    restart_old_wallet_for_scan(old_wallet).await?;
+    print_old_wallet_address(old_wallet).await;
     let mut guard = OldWalletGuard { driver: old_wallet };
     let mut scenarios = Vec::new();
     scenarios.push(run_b0(&*guard.driver).await?);
@@ -39,14 +40,10 @@ async fn run_old_wallet_scenarios(
 
     let h_birth = guard.driver.get_tip_height().await.unwrap_or(0);
 
-    guard.driver.stop();
-    guard.driver.reset().await?;
-    guard.driver.start().await?;
+    restart_old_wallet_for_scan(guard.driver).await?;
     scenarios.push(run_s2(&*guard.driver).await?);
 
-    guard.driver.stop();
-    guard.driver.reset().await?;
-    guard.driver.start().await?;
+    restart_old_wallet_for_scan(guard.driver).await?;
     scenarios.push(run_s3(&*guard.driver, h_birth).await?);
 
     scenarios.push(run_s4(&*guard.driver, config).await?);
@@ -54,17 +51,31 @@ async fn run_old_wallet_scenarios(
 
     let h_birth_after_s5 = guard.driver.get_tip_height().await.unwrap_or(h_birth);
 
-    guard.driver.stop();
-    guard.driver.reset().await?;
-    guard.driver.start().await?;
+    restart_old_wallet_for_scan(guard.driver).await?;
     scenarios.push(run_s6(&*guard.driver).await?);
 
-    guard.driver.stop();
-    guard.driver.reset().await?;
-    guard.driver.start().await?;
+    restart_old_wallet_for_scan(guard.driver).await?;
     scenarios.push(run_s7(&*guard.driver, h_birth_after_s5).await?);
 
     Ok(scenarios)
+}
+
+async fn restart_old_wallet_for_scan(old_wallet: &mut OldWalletDriver) -> anyhow::Result<()> {
+    old_wallet.stop();
+    old_wallet.reset().await?;
+    old_wallet.start().await
+}
+
+async fn print_old_wallet_address(old_wallet: &OldWalletDriver) {
+    if let Some(line) = old_wallet.find_wallet_address_in_logs() {
+        println!("B0 old_wallet log address line: {line}");
+        return;
+    }
+
+    match old_wallet.get_wallet_address().await {
+        Ok(address) => println!("B0 old_wallet address: {address}"),
+        Err(error) => eprintln!("B0 old_wallet address unavailable: {error}"),
+    }
 }
 
 #[tokio::main]

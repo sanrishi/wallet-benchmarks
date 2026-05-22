@@ -1,3 +1,5 @@
+use std::fs;
+use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::process::{Child, Command};
 use std::time::{Duration, Instant};
@@ -71,7 +73,50 @@ impl OldWalletDriver {
             let _ = child.kill();
             let _ = child.wait();
         }
+        std::thread::sleep(Duration::from_millis(500));
         self.process = None;
+    }
+
+    pub fn find_wallet_address_in_logs(&self) -> Option<String> {
+        let log_dir = self
+            .data_dir
+            .join("esmeralda")
+            .join("log")
+            .join("wallet");
+        let candidates = ["stdout.log", "other.log", "base_layer.log"];
+
+        for file_name in candidates {
+            let path = log_dir.join(file_name);
+            let Ok(contents) = fs::read_to_string(path) else {
+                continue;
+            };
+            for line in contents.lines().rev() {
+                if line.contains("address") || line.contains("Address") {
+                    return Some(line.to_string());
+                }
+            }
+        }
+
+        None
+    }
+
+    pub async fn get_wallet_address(&self) -> anyhow::Result<String> {
+        use tari_rpc::wallet_client::WalletClient;
+
+        let mut client = WalletClient::connect(self.grpc_url.clone()).await?;
+        let resp = client
+            .get_complete_address(tari_rpc::Empty {})
+            .await?
+            .into_inner();
+
+        if !resp.one_sided_address_base58.is_empty() {
+            return Ok(resp.one_sided_address_base58);
+        }
+        if !resp.interactive_address_base58.is_empty() {
+            return Ok(resp.interactive_address_base58);
+        }
+
+        Err(anyhow!("wallet returned no printable address"))
     }
 
     async fn get_unspent_output_count(&self) -> anyhow::Result<u64> {
@@ -168,12 +213,46 @@ impl WalletDriver for OldWalletDriver {
         // Caller must call stop() before reset() for old_wallet.
         // reset() only handles filesystem; process lifecycle is
         // managed by start()/stop() in main.rs.
-        if self.data_dir.exists() {
-            std::fs::remove_dir_all(&self.data_dir)?;
+        let mut last_error = None;
+        for _ in 0..20 {
+            if self.data_dir.exists() {
+                match fs::remove_dir_all(&self.data_dir) {
+                    Ok(()) => {}
+                    Err(error)
+                        if matches!(
+                            error.kind(),
+                            ErrorKind::NotFound | ErrorKind::PermissionDenied
+                        ) || error.raw_os_error() == Some(32) =>
+                    {
+                        last_error = Some(error);
+                        std::thread::sleep(Duration::from_millis(500));
+                        continue;
+                    }
+                    Err(error) => return Err(error.into()),
+                }
+            }
+
+            match fs::create_dir_all(&self.data_dir) {
+                Ok(()) => {
+                    std::thread::sleep(Duration::from_millis(500));
+                    return Ok(());
+                }
+                Err(error)
+                    if matches!(
+                        error.kind(),
+                        ErrorKind::AlreadyExists | ErrorKind::PermissionDenied
+                    ) || error.raw_os_error() == Some(32) =>
+                {
+                    last_error = Some(error);
+                    std::thread::sleep(Duration::from_millis(500));
+                }
+                Err(error) => return Err(error.into()),
+            }
         }
-        std::fs::create_dir_all(&self.data_dir)?;
-        std::thread::sleep(Duration::from_millis(250));
-        Ok(())
+
+        Err(last_error
+            .unwrap_or_else(|| std::io::Error::other("wallet data directory reset timed out"))
+            .into())
     }
 
     async fn get_balance(&self) -> anyhow::Result<u64> {

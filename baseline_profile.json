@@ -1,1 +1,3408 @@
-[]
+[
+  {
+    "cpu_model": "        Intel(R) Core(TM) i5-3470 CPU @ 3.20GHz",
+    "ram_kb": 8366504,
+    "os": "Windows 10 Pro",
+    "disk_type": "unknown",
+    "network_path": "remote:http://rpc.esmeralda.tari.com:18142",
+    "console_wallet_version": "pinned-see-README",
+    "minotari_cli_version": "pinned-see-README",
+    "base_node_version": "pinned-see-README",
+    "scan_delta_s2_minus_b0": null,
+    "scan_delta_s6_minus_s2": null,
+    "s5_throughput_multiplier": null,
+    "wallet_mode": "old_wallet",
+    "config_snapshot": {
+      "a_fund": 10000,
+      "base_node_grpc_url": "http://rpc.esmeralda.tari.com:18142",
+      "base_node_http_url": "http://rpc.esmeralda.tari.com:18142",
+      "c_min": 3,
+      "concurrent_batches": [
+        8,
+        16,
+        32,
+        64,
+        128
+      ],
+      "doubling_rounds": 6,
+      "fanout_outputs_per_tx": 8,
+      "fee_rate": "",
+      "grpc_port": 18143,
+      "new_wallet_data_dir": "",
+      "old_wallet_data_dir": "./wallet-data",
+      "old_wallet_password": "benchmark123",
+      "payment_processor_data_dir": "",
+      "s4_t_budget_secs": 900,
+      "s5_k": 10,
+      "s5_m": 100,
+      "volume_target": 512,
+      "wallet_bin_path": "./harness/minotari_console_wallet.exe"
+    },
+    "scenarios": [
+      {
+        "scenario_name": "B0",
+        "wall_clock_secs": 85.909461,
+        "total_fees": 0,
+        "success_count": 1,
+        "failure_count": 0,
+        "balance_delta": 0,
+        "tx_metrics": [],
+        "scan_metrics": {
+          "wall_clock_secs": 82.7802318,
+          "blocks_per_sec": 7928.59582207645,
+          "h_tip_start": 0,
+          "h_tip_end": 656331,
+          "outputs_found": 0,
+          "peak_rss_kb": 29155328,
+          "peak_cpu_percent": 17.889907836914062
+        }
+      },
+      {
+        "scenario_name": "S0",
+        "wall_clock_secs": 306.0636033,
+        "total_fees": 0,
+        "success_count": 0,
+        "failure_count": 1,
+        "balance_delta": 10000,
+        "tx_metrics": [],
+        "scan_metrics": null
+      },
+      {
+        "scenario_name": "S1",
+        "wall_clock_secs": 0.002884,
+        "total_fees": 0,
+        "success_count": 0,
+        "failure_count": 1,
+        "balance_delta": 0,
+        "tx_metrics": [
+          {
+            "tx_id": "",
+            "construction_secs": 0.000986,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:42:02 GMT\"} }"
+          }
+        ],
+        "scan_metrics": null
+      },
+      {
+        "scenario_name": "S2",
+        "wall_clock_secs": 168.3134721,
+        "total_fees": 0,
+        "success_count": 0,
+        "failure_count": 1,
+        "balance_delta": 0,
+        "tx_metrics": [],
+        "scan_metrics": {
+          "wall_clock_secs": 164.5826595,
+          "blocks_per_sec": 3987.904934784457,
+          "h_tip_start": 0,
+          "h_tip_end": 656340,
+          "outputs_found": 0,
+          "peak_rss_kb": 28561408,
+          "peak_cpu_percent": 19.909503936767578
+        }
+      },
+      {
+        "scenario_name": "S3",
+        "wall_clock_secs": 129.012201,
+        "total_fees": 0,
+        "success_count": 0,
+        "failure_count": 1,
+        "balance_delta": 0,
+        "tx_metrics": [],
+        "scan_metrics": {
+          "wall_clock_secs": 120.6139787,
+          "blocks_per_sec": 0.04974547780173676,
+          "h_tip_start": 0,
+          "h_tip_end": 656343,
+          "outputs_found": 0,
+          "peak_rss_kb": 28762112,
+          "peak_cpu_percent": 17.16937255859375
+        }
+      },
+      {
+        "scenario_name": "S4",
+        "wall_clock_secs": 0.1322688,
+        "total_fees": 0,
+        "success_count": 0,
+        "failure_count": 248,
+        "balance_delta": 0,
+        "tx_metrics": [
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          }
+        ],
+        "scan_metrics": null
+      },
+      {
+        "scenario_name": "S5",
+        "wall_clock_secs": 0.0899578,
+        "total_fees": 0,
+        "success_count": 0,
+        "failure_count": 110,
+        "balance_delta": 0,
+        "tx_metrics": [
+          {
+            "tx_id": "",
+            "construction_secs": 1.6e-6,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "send_batch not supported by this driver"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 7e-7,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "send_batch not supported by this driver"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 6e-7,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "send_batch not supported by this driver"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 6e-7,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "send_batch not supported by this driver"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 5e-7,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "send_batch not supported by this driver"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 1.3e-6,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "send_batch not supported by this driver"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 5e-7,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "send_batch not supported by this driver"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 6e-7,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "send_batch not supported by this driver"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 1.1e-6,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "send_batch not supported by this driver"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 6e-7,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "send_batch not supported by this driver"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0006147,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0005902,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0005725,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0132163,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0008256,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0006788,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0005978,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0005191,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004484,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004582,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0121705,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.000661,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0005438,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0006057,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0005224,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0005082,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0005332,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.000515,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0005009,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0005473,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0005089,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.000544,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004747,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004245,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004255,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.000433,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004107,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004271,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.000412,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004413,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004142,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004143,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004184,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004161,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004291,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004298,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.000402,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004126,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004091,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004193,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004076,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004256,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004407,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0003974,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004161,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.000407,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004399,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0006662,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0159832,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0010146,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0006489,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0006898,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0005519,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004876,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004615,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004479,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004969,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004622,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004467,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004802,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004841,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004428,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004549,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004301,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004297,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004087,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004275,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004213,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004424,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004023,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004068,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004259,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004255,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004485,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.000444,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004146,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004057,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004306,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004361,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004263,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004373,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0005045,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004825,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004172,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0007064,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0006125,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004487,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004695,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004173,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004161,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004132,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.000436,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004202,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004141,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004222,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004376,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004288,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004242,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004264,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          },
+          {
+            "tx_id": "",
+            "construction_secs": 0.0004081,
+            "broadcast_to_mempool_secs": 0.0,
+            "broadcast_to_confirmed_secs": 0.0,
+            "fee_paid": 0,
+            "success": false,
+            "error": "status: InvalidArgument, message: \"Destination address at index 0 is malformed\", details: [], metadata: MetadataMap { headers: {\"content-type\": \"application/grpc\", \"date\": \"Fri, 22 May 2026 20:47:05 GMT\"} }"
+          }
+        ],
+        "scan_metrics": null
+      },
+      {
+        "scenario_name": "S6",
+        "wall_clock_secs": 114.9340095,
+        "total_fees": 0,
+        "success_count": 1,
+        "failure_count": 0,
+        "balance_delta": 0,
+        "tx_metrics": [],
+        "scan_metrics": {
+          "wall_clock_secs": 112.0087607,
+          "blocks_per_sec": 5859.791643958436,
+          "h_tip_start": 0,
+          "h_tip_end": 656348,
+          "outputs_found": 0,
+          "peak_rss_kb": 28995584,
+          "peak_cpu_percent": 17.727272033691406
+        }
+      },
+      {
+        "scenario_name": "S7",
+        "wall_clock_secs": 101.8224085,
+        "total_fees": 0,
+        "success_count": 1,
+        "failure_count": 0,
+        "balance_delta": 0,
+        "tx_metrics": [],
+        "scan_metrics": {
+          "wall_clock_secs": 98.9044567,
+          "blocks_per_sec": 0.06066460703787477,
+          "h_tip_start": 0,
+          "h_tip_end": 656349,
+          "outputs_found": 0,
+          "peak_rss_kb": 29093888,
+          "peak_cpu_percent": 18.10344696044922
+        }
+      }
+    ]
+  }
+]
