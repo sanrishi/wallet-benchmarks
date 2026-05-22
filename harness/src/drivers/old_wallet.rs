@@ -38,7 +38,8 @@ impl OldWalletDriver {
     pub async fn start(&mut self) -> anyhow::Result<()> {
         let child = Command::new(&self.wallet_bin)
             .arg("--grpc-enabled")
-            .arg(format!("--grpc-port={}", self.grpc_port))
+            .arg("--grpc-address")
+            .arg(format!("127.0.0.1:{}", self.grpc_port))
             .arg(format!("--base-path={}", self.data_dir.display()))
             .arg("--non-interactive-mode")
             .spawn()?;
