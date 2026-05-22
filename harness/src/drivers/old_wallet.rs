@@ -39,7 +39,7 @@ impl OldWalletDriver {
         let child = Command::new(&self.wallet_bin)
             .arg("--grpc-enabled")
             .arg("--grpc-address")
-            .arg(format!("127.0.0.1:{}", self.grpc_port))
+            .arg(format!("/ip4/127.0.0.1/tcp/{}", self.grpc_port))
             .arg(format!("--base-path={}", self.data_dir.display()))
             .arg("--non-interactive-mode")
             .spawn()?;
