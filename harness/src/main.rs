@@ -15,7 +15,7 @@ use drivers::new_wallet::NewWalletDriver;
 use drivers::old_wallet::OldWalletDriver;
 use drivers::payment_processor::PaymentProcessorDriver;
 use metrics::BenchmarkReport;
-use scenarios::run_all_scenarios;
+use scenarios::{run_all_scenarios, run_b0, run_s0, run_s1, run_s2, run_s3, run_s4, run_s5, run_s6, run_s7};
 use sysinfo::System;
 
 struct OldWalletGuard<'a> {
@@ -64,13 +64,53 @@ async fn main() -> anyhow::Result<()> {
     );
     old_wallet.start().await?;
     let old_wallet_scenarios = {
-        let guard = OldWalletGuard { driver: &mut old_wallet };
-        run_all_scenarios(&*guard.driver, &config).await?
+        let mut guard = OldWalletGuard { driver: &mut old_wallet };
+        let mut scenarios = Vec::new();
+        scenarios.push(run_b0(&*guard.driver).await?);
+        scenarios.push(run_s0(&*guard.driver, &config).await?);
+        scenarios.push(run_s1(&*guard.driver, &config).await?);
+
+        let h_birth = guard.driver.get_tip_height().await.unwrap_or(0);
+
+        guard.driver.stop();
+        guard.driver.reset().await?;
+        guard.driver.start().await?;
+        scenarios.push(run_s2(&*guard.driver).await?);
+
+        guard.driver.stop();
+        guard.driver.reset().await?;
+        guard.driver.start().await?;
+        scenarios.push(run_s3(&*guard.driver, h_birth).await?);
+
+        scenarios.push(run_s4(&*guard.driver, &config).await?);
+        scenarios.push(run_s5(&*guard.driver, &config).await?);
+
+        let h_birth_after_s5 = guard.driver.get_tip_height().await.unwrap_or(h_birth);
+
+        guard.driver.stop();
+        guard.driver.reset().await?;
+        guard.driver.start().await?;
+        scenarios.push(run_s6(&*guard.driver).await?);
+
+        guard.driver.stop();
+        guard.driver.reset().await?;
+        guard.driver.start().await?;
+        scenarios.push(run_s7(&*guard.driver, h_birth_after_s5).await?);
+
+        scenarios
     };
     reports.push(BenchmarkReport {
         cpu_model: cpu_model.clone(),
         ram_kb,
         os: os.clone(),
+        disk_type: "unknown".to_string(),
+        network_path: format!("remote:{}", config.base_node_grpc_url),
+        console_wallet_version: "pinned-see-README".to_string(),
+        minotari_cli_version: "pinned-see-README".to_string(),
+        base_node_version: "pinned-see-README".to_string(),
+        scan_delta_s2_minus_b0: None,
+        scan_delta_s6_minus_s2: None,
+        s5_throughput_multiplier: None,
         wallet_mode: old_wallet.mode_name().to_string(),
         config_snapshot: config_snapshot.clone(),
         scenarios: old_wallet_scenarios,
@@ -85,6 +125,14 @@ async fn main() -> anyhow::Result<()> {
         cpu_model: cpu_model.clone(),
         ram_kb,
         os: os.clone(),
+        disk_type: "unknown".to_string(),
+        network_path: format!("remote:{}", config.base_node_grpc_url),
+        console_wallet_version: "pinned-see-README".to_string(),
+        minotari_cli_version: "pinned-see-README".to_string(),
+        base_node_version: "pinned-see-README".to_string(),
+        scan_delta_s2_minus_b0: None,
+        scan_delta_s6_minus_s2: None,
+        s5_throughput_multiplier: None,
         wallet_mode: new_wallet.mode_name().to_string(),
         config_snapshot: config_snapshot.clone(),
         scenarios: new_wallet_scenarios,
@@ -99,6 +147,14 @@ async fn main() -> anyhow::Result<()> {
         cpu_model,
         ram_kb,
         os,
+        disk_type: "unknown".to_string(),
+        network_path: format!("remote:{}", config.base_node_grpc_url),
+        console_wallet_version: "pinned-see-README".to_string(),
+        minotari_cli_version: "pinned-see-README".to_string(),
+        base_node_version: "pinned-see-README".to_string(),
+        scan_delta_s2_minus_b0: None,
+        scan_delta_s6_minus_s2: None,
+        s5_throughput_multiplier: None,
         wallet_mode: payment_processor.mode_name().to_string(),
         config_snapshot,
         scenarios: payment_processor_scenarios,

@@ -159,6 +159,9 @@ impl WalletDriver for OldWalletDriver {
     fn mode_name(&self) -> &str { "old_wallet" }
 
     async fn reset(&self) -> anyhow::Result<()> {
+        // Caller must call stop() before reset() for old_wallet.
+        // reset() only handles filesystem; process lifecycle is
+        // managed by start()/stop() in main.rs.
         if self.data_dir.exists() {
             std::fs::remove_dir_all(&self.data_dir)?;
         }

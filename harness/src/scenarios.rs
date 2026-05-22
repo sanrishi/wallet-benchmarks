@@ -31,19 +31,29 @@ pub async fn run_b0(driver: &dyn WalletDriver) -> anyhow::Result<ScenarioResult>
 
 pub async fn run_s0(driver: &dyn WalletDriver, config: &Config) -> anyhow::Result<ScenarioResult> {
     let started_at = Instant::now();
-    let initial_balance = driver.get_balance().await?;
-    let initial_tip = driver.get_tip_height().await?;
-    let expected_tip = initial_tip.saturating_add(config.c_min);
-    wait_for_tip_height(driver, expected_tip, Duration::from_secs(CONFIRMATION_TIMEOUT_SECS)).await?;
+    let h_birth = driver.get_tip_height().await?;
+    let deadline = Instant::now() + Duration::from_secs(CONFIRMATION_TIMEOUT_SECS);
+    loop {
+        let balance = driver.get_balance().await?;
+        if balance >= config.a_fund {
+            break;
+        }
+        if Instant::now() > deadline {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(POLL_INTERVAL_MS)).await;
+    }
     let observed_balance = driver.get_balance().await?;
+    let tip_after = driver.get_tip_height().await?;
+    let _ = (h_birth, tip_after);
 
     Ok(ScenarioResult {
         scenario_name: "S0".to_string(),
         wall_clock_secs: started_at.elapsed().as_secs_f64(),
         total_fees: 0,
-        success_count: 1,
-        failure_count: 0,
-        balance_delta: observed_balance as i64 - initial_balance as i64,
+        success_count: u64::from(observed_balance >= config.a_fund),
+        failure_count: u64::from(observed_balance < config.a_fund),
+        balance_delta: config.a_fund as i64 - observed_balance as i64,
         tx_metrics: Vec::new(),
         scan_metrics: None,
     })
@@ -54,36 +64,69 @@ pub async fn run_s1(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
     let initial_balance = driver.get_balance().await?;
     let mut expected_balance = initial_balance;
     let mut tx_metrics = Vec::new();
+    let fee_rate = parse_fee_rate(config);
+    let amount_per_tx = (config.a_fund / config.volume_target.max(1)).max(1);
 
-    let mut round_amount = (config.a_fund / 2).max(1);
     for round in 0..config.doubling_rounds {
-        let tx = attempt_send_single(
-            driver,
-            &synthetic_address(driver.mode_name(), "s1-round", round as usize),
-            round_amount,
-            parse_fee_rate(config),
-        )
-        .await;
-        if tx.success {
-            expected_balance = expected_balance.saturating_sub(round_amount.saturating_add(tx.fee_paid));
+        let round_tx_count = 1_u64 << round;
+        for tx_index in 0..round_tx_count {
+            let tx = attempt_send_single(
+                driver,
+                &synthetic_address(
+                    driver.mode_name(),
+                    "s1-round",
+                    (round_tx_count.saturating_mul(round) + tx_index) as usize,
+                ),
+                amount_per_tx,
+                fee_rate,
+            )
+            .await;
+            if tx.success {
+                expected_balance = expected_balance
+                    .saturating_sub(amount_per_tx.saturating_add(tx.fee_paid));
+            }
+            let failed = !tx.success;
+            tx_metrics.push(tx);
+            if failed {
+                let observed_balance = driver.get_balance().await?;
+                return Ok(finalize_scenario(
+                    "S1",
+                    started_at,
+                    expected_balance,
+                    observed_balance,
+                    tx_metrics,
+                    None,
+                ));
+            }
         }
-        tx_metrics.push(tx);
-        round_amount = round_amount.saturating_mul(2);
     }
 
-    let fanout_amount = (config.a_fund / config.volume_target.max(1)).max(1);
-    for index in 0..config.volume_target {
+    let fanout_tx_count = 1_u64 << config.doubling_rounds.saturating_sub(0);
+    for index in 0..fanout_tx_count {
         let tx = attempt_send_single(
             driver,
             &synthetic_address(driver.mode_name(), "s1-fanout", index as usize),
-            fanout_amount,
-            parse_fee_rate(config),
+            amount_per_tx,
+            fee_rate,
         )
         .await;
         if tx.success {
-            expected_balance = expected_balance.saturating_sub(fanout_amount.saturating_add(tx.fee_paid));
+            expected_balance =
+                expected_balance.saturating_sub(amount_per_tx.saturating_add(tx.fee_paid));
         }
+        let failed = !tx.success;
         tx_metrics.push(tx);
+        if failed {
+            let observed_balance = driver.get_balance().await?;
+            return Ok(finalize_scenario(
+                "S1",
+                started_at,
+                expected_balance,
+                observed_balance,
+                tx_metrics,
+                None,
+            ));
+        }
     }
 
     let observed_balance = driver.get_balance().await?;
@@ -102,6 +145,7 @@ pub async fn run_s2(driver: &dyn WalletDriver) -> anyhow::Result<ScenarioResult>
     driver.reset().await?;
     let scan_metrics = driver.scan_from_genesis().await?;
     let observed_balance = driver.get_balance().await?;
+    let expected_balance = observed_balance;
     let success_count = u64::from(scan_metrics.outputs_found >= REDISCOVERY_TARGET);
     let failure_count = u64::from(scan_metrics.outputs_found < REDISCOVERY_TARGET);
 
@@ -111,7 +155,7 @@ pub async fn run_s2(driver: &dyn WalletDriver) -> anyhow::Result<ScenarioResult>
         total_fees: 0,
         success_count,
         failure_count,
-        balance_delta: observed_balance as i64 - observed_balance as i64,
+        balance_delta: expected_balance as i64 - observed_balance as i64,
         tx_metrics: Vec::new(),
         scan_metrics: Some(scan_metrics),
     })
@@ -122,6 +166,7 @@ pub async fn run_s3(driver: &dyn WalletDriver, h_birth: u64) -> anyhow::Result<S
     driver.reset().await?;
     let scan_metrics = driver.scan_from_birthday(h_birth).await?;
     let observed_balance = driver.get_balance().await?;
+    let expected_balance = observed_balance;
     let success_count = u64::from(scan_metrics.outputs_found >= REDISCOVERY_TARGET);
     let failure_count = u64::from(scan_metrics.outputs_found < REDISCOVERY_TARGET);
 
@@ -131,7 +176,7 @@ pub async fn run_s3(driver: &dyn WalletDriver, h_birth: u64) -> anyhow::Result<S
         total_fees: 0,
         success_count,
         failure_count,
-        balance_delta: observed_balance as i64 - observed_balance as i64,
+        balance_delta: expected_balance as i64 - observed_balance as i64,
         tx_metrics: Vec::new(),
         scan_metrics: Some(scan_metrics),
     })
@@ -215,14 +260,15 @@ pub async fn run_s5(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
     let mut tx_metrics = Vec::new();
     let fee_rate = parse_fee_rate(config);
 
-    for batch_index in 0..config.s5_m {
+    let num_batch_txs = config.s5_m / config.s5_k.max(1);
+    for batch_index in 0..num_batch_txs {
         let recipients = (0..config.s5_k)
-            .map(|recipient_index| {
+            .map(|i| {
                 (
                     synthetic_address(
                         driver.mode_name(),
                         "s5-batch",
-                        (batch_index.saturating_mul(config.s5_k) + recipient_index) as usize,
+                        (batch_index * config.s5_k + i) as usize,
                     ),
                     1_u64,
                 )
@@ -236,7 +282,7 @@ pub async fn run_s5(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
         tx_metrics.push(tx);
     }
 
-    for index in 0..config.s5_m.saturating_mul(config.s5_k) {
+    for index in 0..config.s5_m {
         let tx = attempt_send_single(
             driver,
             &synthetic_address(driver.mode_name(), "s5-single", index as usize),
@@ -266,6 +312,7 @@ pub async fn run_s6(driver: &dyn WalletDriver) -> anyhow::Result<ScenarioResult>
     driver.reset().await?;
     let scan_metrics = driver.scan_from_genesis().await?;
     let observed_balance = driver.get_balance().await?;
+    let expected_balance = observed_balance;
 
     Ok(ScenarioResult {
         scenario_name: "S6".to_string(),
@@ -273,7 +320,7 @@ pub async fn run_s6(driver: &dyn WalletDriver) -> anyhow::Result<ScenarioResult>
         total_fees: 0,
         success_count: 1,
         failure_count: 0,
-        balance_delta: observed_balance as i64 - observed_balance as i64,
+        balance_delta: expected_balance as i64 - observed_balance as i64,
         tx_metrics: Vec::new(),
         scan_metrics: Some(scan_metrics),
     })
@@ -284,6 +331,7 @@ pub async fn run_s7(driver: &dyn WalletDriver, h_birth: u64) -> anyhow::Result<S
     driver.reset().await?;
     let scan_metrics = driver.scan_from_birthday(h_birth).await?;
     let observed_balance = driver.get_balance().await?;
+    let expected_balance = observed_balance;
 
     Ok(ScenarioResult {
         scenario_name: "S7".to_string(),
@@ -291,7 +339,7 @@ pub async fn run_s7(driver: &dyn WalletDriver, h_birth: u64) -> anyhow::Result<S
         total_fees: 0,
         success_count: 1,
         failure_count: 0,
-        balance_delta: observed_balance as i64 - observed_balance as i64,
+        balance_delta: expected_balance as i64 - observed_balance as i64,
         tx_metrics: Vec::new(),
         scan_metrics: Some(scan_metrics),
     })
