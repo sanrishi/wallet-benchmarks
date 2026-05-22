@@ -70,6 +70,10 @@ impl OldWalletDriver {
         if let Some(ref mut child) = self.process {
             let _ = child.kill();
         }
+        // Wait for process to fully exit
+        if let Some(ref mut child) = self.process {
+            let _ = child.wait();
+        }
         self.process = None;
     }
 
@@ -171,6 +175,7 @@ impl WalletDriver for OldWalletDriver {
             std::fs::remove_dir_all(&self.data_dir)?;
         }
         std::fs::create_dir_all(&self.data_dir)?;
+        std::thread::sleep(Duration::from_millis(250));
         Ok(())
     }
 
