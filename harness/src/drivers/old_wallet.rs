@@ -69,9 +69,6 @@ impl OldWalletDriver {
     pub fn stop(&mut self) {
         if let Some(ref mut child) = self.process {
             let _ = child.kill();
-        }
-        // Wait for process to fully exit
-        if let Some(ref mut child) = self.process {
             let _ = child.wait();
         }
         self.process = None;
