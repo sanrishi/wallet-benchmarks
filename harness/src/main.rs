@@ -5,7 +5,6 @@ mod metrics;
 mod scenarios;
 
 use std::fs::{read_to_string, File};
-use std::path::Path;
 use std::path::PathBuf;
 
 use anyhow::Context;
@@ -34,7 +33,7 @@ async fn run_old_wallet_scenarios(
 ) -> anyhow::Result<Vec<ScenarioResult>> {
     restart_old_wallet_for_scan(old_wallet).await?;
     print_old_wallet_address(old_wallet).await;
-    let mut guard = OldWalletGuard { driver: old_wallet };
+    let guard = OldWalletGuard { driver: old_wallet };
     let mut scenarios = Vec::new();
     scenarios.push(run_b0(&*guard.driver).await?);
     scenarios.push(run_s0(&*guard.driver, config).await?);
@@ -228,8 +227,8 @@ async fn main() -> anyhow::Result<()> {
         scenarios: payment_processor_scenarios,
     });
 
-    let report_path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
+    let report_path = std::env::current_dir()
+        .context("failed to resolve current working directory for report output")?
         .join("baseline_profile.json");
     let report_file = File::create(&report_path)
         .with_context(|| format!("failed to create {}", report_path.display()))?;

@@ -1,8 +1,7 @@
 use async_trait::async_trait;
 use std::path::PathBuf;
-use std::process::Command;
 use std::str::FromStr;
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::time::Instant;
 
 use anyhow::{anyhow, Context};
 use reqwest::Client;
@@ -23,6 +22,8 @@ use tari_transaction_components::{
         sign_locked_transaction,
     },
 };
+use tempfile::NamedTempFile;
+use tokio::process::Command;
 
 use crate::driver::WalletDriver;
 use crate::metrics::{ScanMetrics, TxMetrics};
@@ -60,18 +61,11 @@ impl PaymentProcessorDriver {
         self.data_dir.join("wallet.db")
     }
 
-    fn next_temp_file(&self, stem: &str) -> PathBuf {
-        let nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos();
-        self.data_dir.join(format!("{stem}_{nanos}.json"))
-    }
-
-    fn run_cli_command(&self, args: &[&str]) -> anyhow::Result<String> {
+    async fn run_cli_command(&self, args: &[&str]) -> anyhow::Result<String> {
         let output = Command::new(&self.minotari_bin)
             .args(args)
             .output()
+            .await
             .with_context(|| {
                 format!(
                     "failed to execute minotari CLI at {}",
@@ -81,10 +75,7 @@ impl PaymentProcessorDriver {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(anyhow!(
-                "minotari CLI command failed: {}",
-                stderr.trim()
-            ));
+            return Err(anyhow!("minotari CLI command failed: {}", stderr.trim()));
         }
 
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
@@ -102,29 +93,66 @@ impl PaymentProcessorDriver {
             .map(str::trim)
             .ok_or_else(|| anyhow!("balance output did not contain a parsable amount"))?;
 
-        if let Some(value) = amount
-            .strip_suffix("µT")
-            .or_else(|| amount.strip_suffix("ÂµT"))
-            .map(str::trim)
-        {
-            let value = value.replace(',', "");
-            return value
-                .parse::<u64>()
-                .with_context(|| format!("failed to parse microTari balance from '{value}'"));
+        let numeric = amount
+            .chars()
+            .take_while(|ch| ch.is_ascii_digit() || matches!(ch, '.' | ','))
+            .collect::<String>();
+        let suffix = amount[numeric.len()..].trim();
+        let numeric = numeric.replace(',', "");
+
+        if suffix == "T" {
+            return Self::parse_tari_to_micro_tari(&numeric);
         }
 
-        if let Some(value) = amount.strip_suffix('T').map(str::trim) {
-            let value = value.replace(',', "");
-            let tari = value
-                .parse::<f64>()
-                .with_context(|| format!("failed to parse Tari balance from '{value}'"))?;
-            return Ok((tari * 1_000_000.0).round() as u64);
+        if suffix.contains('T') {
+            return numeric
+                .parse::<u64>()
+                .with_context(|| format!("failed to parse microTari balance from '{amount}'"));
         }
 
         Err(anyhow!("unsupported balance output format: {amount}"))
     }
 
-    fn ensure_wallet_initialized(&self) -> anyhow::Result<()> {
+    fn parse_tari_to_micro_tari(value: &str) -> anyhow::Result<u64> {
+        let (whole, fractional) = match value.split_once('.') {
+            Some((whole, fractional)) => (whole.trim(), fractional.trim()),
+            None => (value.trim(), ""),
+        };
+
+        let whole = whole
+            .parse::<u64>()
+            .with_context(|| format!("failed to parse Tari whole units from '{value}'"))?;
+
+        let fractional_digits = fractional
+            .chars()
+            .take_while(|ch| ch.is_ascii_digit())
+            .collect::<String>();
+        if fractional_digits.len() > 6 {
+            return Err(anyhow!(
+                "too many fractional Tari digits in '{value}', expected at most 6"
+            ));
+        }
+
+        let mut fractional_padded = fractional_digits;
+        while fractional_padded.len() < 6 {
+            fractional_padded.push('0');
+        }
+
+        let fractional = if fractional_padded.is_empty() {
+            0
+        } else {
+            fractional_padded
+                .parse::<u64>()
+                .with_context(|| format!("failed to parse Tari fractional units from '{value}'"))?
+        };
+
+        whole
+            .checked_mul(1_000_000)
+            .and_then(|base| base.checked_add(fractional))
+            .ok_or_else(|| anyhow!("Tari balance overflow while converting '{value}'"))
+    }
+
+    async fn ensure_wallet_initialized(&self) -> anyhow::Result<()> {
         std::fs::create_dir_all(&self.data_dir)
             .with_context(|| format!("failed to create {}", self.data_dir.display()))?;
 
@@ -147,7 +175,8 @@ impl PaymentProcessorDriver {
             DEFAULT_ACCOUNT_NAME,
             "--seed-words",
             &self.seed_words,
-        ])?;
+        ])
+        .await?;
 
         Ok(())
     }
@@ -233,7 +262,9 @@ impl PaymentProcessorDriver {
         let connection = Connection::open(self.database_path())
             .context("failed to open payment_processor database for tip height")?;
         let height = connection
-            .query_row("SELECT MAX(height) FROM scanned_tip_blocks", [], |row| row.get::<_, Option<u64>>(0))
+            .query_row("SELECT MAX(height) FROM scanned_tip_blocks", [], |row| {
+                row.get::<_, Option<u64>>(0)
+            })
             .optional()
             .context("failed to query scanned_tip_blocks from payment_processor database")?
             .flatten()
@@ -241,15 +272,15 @@ impl PaymentProcessorDriver {
         Ok(height)
     }
 
-    fn scan_from_height(&self, from_height: u64) -> anyhow::Result<ScanMetrics> {
-        self.ensure_wallet_initialized()?;
+    async fn scan_from_height(&self, from_height: u64) -> anyhow::Result<ScanMetrics> {
+        self.ensure_wallet_initialized().await?;
 
         let database_path = self.database_path();
         let database_path = database_path
             .to_str()
             .ok_or_else(|| anyhow!("database path is not valid UTF-8"))?;
         let from_height_string = from_height.to_string();
-        let h_tip_start = self.get_tip_height_blocking()?;
+        let h_tip_start = self.get_tip_height().await?;
         let started_at = Instant::now();
 
         self.run_cli_command(&[
@@ -264,10 +295,11 @@ impl PaymentProcessorDriver {
             DEFAULT_ACCOUNT_NAME,
             "--rescan-from-height",
             &from_height_string,
-        ])?;
+        ])
+        .await?;
 
         let wall_clock_secs = started_at.elapsed().as_secs_f64();
-        let h_tip_end = self.get_tip_height_blocking()?;
+        let h_tip_end = self.get_tip_height().await?;
         let scanned_tip_height = self.get_scanned_tip_height()?;
         let outputs_found = self.get_unspent_output_count()?;
         let scanned_blocks = scanned_tip_height.saturating_sub(from_height);
@@ -288,30 +320,20 @@ impl PaymentProcessorDriver {
         })
     }
 
-    fn get_tip_height_blocking(&self) -> anyhow::Result<u64> {
-        let url = format!("{}/get_tip_info", self.base_node_url.trim_end_matches('/'));
-        let response = reqwest::blocking::get(url)
-            .context("failed to query get_tip_info with blocking client")?
-            .error_for_status()
-            .context("base node returned an HTTP error on blocking get_tip_info")?;
-        let tip: TipInfoResponse = response
-            .json()
-            .context("failed to parse blocking get_tip_info response")?;
-        Ok(tip.metadata.best_block_height)
-    }
-
     async fn send_recipients(
         &self,
         recipients: Vec<(String, u64)>,
     ) -> anyhow::Result<TxMetrics> {
-        self.ensure_wallet_initialized()?;
+        self.ensure_wallet_initialized().await?;
 
         let database_path = self.database_path();
         let database_path = database_path
             .to_str()
             .ok_or_else(|| anyhow!("database path is not valid UTF-8"))?;
-        let output_file = self.next_temp_file("unsigned_batch_tx");
+        let output_file = NamedTempFile::new_in(&self.data_dir)
+            .context("failed to create temporary unsigned batch transaction file")?;
         let output_file_str = output_file
+            .path()
             .to_str()
             .ok_or_else(|| anyhow!("unsigned transaction path is not valid UTF-8"))?;
 
@@ -337,10 +359,10 @@ impl PaymentProcessorDriver {
         args.push("--output-file".to_string());
         args.push(output_file_str.to_string());
         let arg_refs = args.iter().map(String::as_str).collect::<Vec<_>>();
-        self.run_cli_command(&arg_refs)?;
+        self.run_cli_command(&arg_refs).await?;
 
-        let unsigned_json = std::fs::read_to_string(&output_file)
-            .with_context(|| format!("failed to read {}", output_file.display()))?;
+        let unsigned_json = std::fs::read_to_string(output_file.path())
+            .with_context(|| format!("failed to read {}", output_file.path().display()))?;
         let unsigned_tx = PrepareOneSidedTransactionForSigningResult::from_json(&unsigned_json)
             .context("failed to parse unsigned batch transaction JSON")?;
 
@@ -369,8 +391,6 @@ impl PaymentProcessorDriver {
         let broadcast_started = Instant::now();
         let submit_result = self.submit_signed_transaction(&transaction_value).await;
         let broadcast_to_mempool_secs = broadcast_started.elapsed().as_secs_f64();
-
-        let _ = std::fs::remove_file(&output_file);
 
         match submit_result {
             Ok(result) if result.accepted => Ok(TxMetrics {
@@ -404,7 +424,7 @@ impl WalletDriver for PaymentProcessorDriver {
     }
 
     async fn get_balance(&self) -> anyhow::Result<u64> {
-        self.ensure_wallet_initialized()?;
+        self.ensure_wallet_initialized().await?;
         let database_path = self.database_path();
         let database_path = database_path
             .to_str()
@@ -416,7 +436,8 @@ impl WalletDriver for PaymentProcessorDriver {
             database_path,
             "--account-name",
             DEFAULT_ACCOUNT_NAME,
-        ])?;
+        ])
+        .await?;
 
         Self::parse_balance_output(&stdout)
     }
@@ -443,11 +464,11 @@ impl WalletDriver for PaymentProcessorDriver {
     }
 
     async fn scan_from_genesis(&self) -> anyhow::Result<ScanMetrics> {
-        self.scan_from_height(0)
+        self.scan_from_height(0).await
     }
 
     async fn scan_from_birthday(&self, height: u64) -> anyhow::Result<ScanMetrics> {
-        self.scan_from_height(height)
+        self.scan_from_height(height).await
     }
 
     async fn send_single(
