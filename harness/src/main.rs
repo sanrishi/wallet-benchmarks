@@ -79,6 +79,43 @@ async fn print_old_wallet_address(old_wallet: &OldWalletDriver) {
     }
 }
 
+async fn print_all_wallet_addresses(config: &Config) -> anyhow::Result<()> {
+    let mut old_wallet = OldWalletDriver::new(
+        require_nonempty_path("wallet_bin_path", &config.wallet_bin_path)?,
+        require_nonempty_path("old_wallet_data_dir", &config.old_wallet_data_dir)?,
+        config.old_wallet_password.clone(),
+        config.grpc_port,
+    );
+    old_wallet.start().await?;
+    let old_wallet_result = old_wallet.get_self_address().await;
+    old_wallet.stop();
+    println!("old_wallet: {}", old_wallet_result?);
+
+    let new_wallet = NewWalletDriver::new(
+        require_nonempty_path("minotari_bin_path", &config.minotari_bin_path)?,
+        require_nonempty_path("new_wallet_data_dir", &config.new_wallet_data_dir)?,
+        config.base_node_http_url.clone(),
+        config.new_wallet_password.clone(),
+    )?;
+    println!("new_wallet: {}", new_wallet.get_self_address().await?);
+
+    let payment_processor = PaymentProcessorDriver::new(
+        require_nonempty_path("minotari_bin_path", &config.minotari_bin_path)?,
+        require_nonempty_path(
+            "payment_processor_data_dir",
+            &config.payment_processor_data_dir,
+        )?,
+        config.base_node_http_url.clone(),
+        config.payment_processor_password.clone(),
+    )?;
+    println!(
+        "payment_processor: {}",
+        payment_processor.get_self_address().await?
+    );
+
+    Ok(())
+}
+
 fn require_nonempty_path(label: &str, value: &str) -> anyhow::Result<PathBuf> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
@@ -162,15 +199,23 @@ fn build_report(
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let config_path = std::env::args()
-        .skip_while(|a| a != "--config")
+    let args = std::env::args().collect::<Vec<_>>();
+    let print_addresses = args.iter().any(|arg| arg == "--print-addresses");
+    let config_path = args
+        .iter()
+        .skip_while(|a| a.as_str() != "--config")
         .nth(1)
-        .map(PathBuf::from)
+        .map(|arg| PathBuf::from(arg.as_str()))
         .unwrap_or_else(|| PathBuf::from("config.toml"));
     let config_raw = read_to_string(&config_path)
         .with_context(|| format!("failed to read config from {}", config_path.display()))?;
     let config: Config = toml::from_str(&config_raw)
         .with_context(|| format!("failed to parse config from {}", config_path.display()))?;
+
+    if print_addresses {
+        print_all_wallet_addresses(&config).await?;
+        return Ok(());
+    }
 
     let config_snapshot = serde_json::to_value(&config).context("failed to serialize config")?;
     let mut system = System::new_all();
