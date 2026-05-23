@@ -1,4 +1,6 @@
 use async_trait::async_trait;
+use std::fs;
+use std::io;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::Instant;
@@ -35,23 +37,22 @@ pub struct PaymentProcessorDriver {
     pub minotari_bin: PathBuf,
     pub data_dir: PathBuf,
     pub base_node_url: String,
+    http_client: Client,
     password: String,
     seed_words: String,
 }
 
 impl PaymentProcessorDriver {
     pub fn new(minotari_bin: PathBuf, data_dir: PathBuf, base_node_url: String) -> anyhow::Result<Self> {
-        let seed_words = CipherSeed::random()
-            .to_mnemonic(MnemonicLanguage::English, None)
-            .context("failed to generate mnemonic seed words for payment_processor")?
-            .join(" ")
-            .reveal()
-            .to_string();
+        fs::create_dir_all(&data_dir)
+            .with_context(|| format!("failed to create {}", data_dir.display()))?;
+        let seed_words = Self::load_or_create_seed_words(&data_dir)?;
 
         Ok(Self {
             minotari_bin,
             data_dir,
             base_node_url,
+            http_client: Client::new(),
             password: DEFAULT_WALLET_PASSWORD.to_string(),
             seed_words,
         })
@@ -59,6 +60,43 @@ impl PaymentProcessorDriver {
 
     fn database_path(&self) -> PathBuf {
         self.data_dir.join("wallet.db")
+    }
+
+    fn seed_words_path(data_dir: &std::path::Path) -> PathBuf {
+        data_dir.join("seed_words.txt")
+    }
+
+    fn load_or_create_seed_words(data_dir: &std::path::Path) -> anyhow::Result<String> {
+        let seed_words_path = Self::seed_words_path(data_dir);
+        let database_path = data_dir.join("wallet.db");
+
+        match fs::read_to_string(&seed_words_path) {
+            Ok(seed_words) => return Ok(seed_words.trim().to_string()),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => {
+                return Err(error).with_context(|| {
+                    format!("failed to read {}", seed_words_path.display())
+                });
+            }
+        }
+
+        if database_path.exists() {
+            return Err(anyhow!(
+                "existing wallet database found at {} but {} is missing; wipe the data dir or restore the seed file",
+                database_path.display(),
+                seed_words_path.display()
+            ));
+        }
+
+        let seed_words = CipherSeed::random()
+            .to_mnemonic(MnemonicLanguage::English, None)
+            .context("failed to generate mnemonic seed words for payment_processor")?
+            .join(" ")
+            .reveal()
+            .to_string();
+        fs::write(&seed_words_path, &seed_words)
+            .with_context(|| format!("failed to write {}", seed_words_path.display()))?;
+        Ok(seed_words)
     }
 
     async fn run_cli_command(&self, args: &[&str]) -> anyhow::Result<String> {
@@ -217,9 +255,8 @@ impl PaymentProcessorDriver {
         &self,
         transaction: &serde_json::Value,
     ) -> anyhow::Result<BroadcastResponse> {
-        let client = Client::new();
         let url = format!("{}/json_rpc", self.base_node_url.trim_end_matches('/'));
-        let response = client
+        let response = self.http_client
             .post(url)
             .json(&serde_json::json!({
                 "jsonrpc": "2.0",
@@ -443,9 +480,8 @@ impl WalletDriver for PaymentProcessorDriver {
     }
 
     async fn get_tip_height(&self) -> anyhow::Result<u64> {
-        let client = Client::new();
         let url = format!("{}/get_tip_info", self.base_node_url.trim_end_matches('/'));
-        let tip: TipInfoResponse = client
+        let tip: TipInfoResponse = self.http_client
             .get(url)
             .send()
             .await

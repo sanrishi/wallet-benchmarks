@@ -1,5 +1,7 @@
 use std::fs;
+use std::fs::File;
 use std::io::ErrorKind;
+use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::process::{Child, Command};
 use std::time::{Duration, Instant};
@@ -87,13 +89,21 @@ impl OldWalletDriver {
 
         for file_name in candidates {
             let path = log_dir.join(file_name);
-            let Ok(contents) = fs::read_to_string(path) else {
+            let Ok(file) = File::open(path) else {
                 continue;
             };
-            for line in contents.lines().rev() {
+            let reader = BufReader::new(file);
+            let mut last_match = None;
+            for line in reader.lines() {
+                let Ok(line) = line else {
+                    continue;
+                };
                 if line.contains("address") || line.contains("Address") {
-                    return Some(line.to_string());
+                    last_match = Some(line);
                 }
+            }
+            if last_match.is_some() {
+                return last_match;
             }
         }
 
