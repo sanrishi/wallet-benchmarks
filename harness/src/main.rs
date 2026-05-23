@@ -87,6 +87,79 @@ fn require_nonempty_path(label: &str, value: &str) -> anyhow::Result<PathBuf> {
     Ok(PathBuf::from(trimmed))
 }
 
+fn scan_duration(scenarios: &[ScenarioResult], name: &str) -> Option<f64> {
+    scenarios
+        .iter()
+        .find(|scenario| scenario.scenario_name == name)
+        .and_then(|scenario| scenario.scan_metrics.as_ref())
+        .map(|scan| scan.wall_clock_secs)
+}
+
+fn tx_duration_sum(metrics: &[metrics::TxMetrics]) -> f64 {
+    metrics
+        .iter()
+        .map(|tx| tx.construction_secs + tx.broadcast_to_mempool_secs + tx.broadcast_to_confirmed_secs)
+        .sum()
+}
+
+fn build_report(
+    cpu_model: String,
+    ram_kb: u64,
+    os: String,
+    network_path: String,
+    wallet_mode: String,
+    config_snapshot: serde_json::Value,
+    scenarios: Vec<ScenarioResult>,
+    config: &Config,
+) -> BenchmarkReport {
+    let scan_delta_s2_minus_b0 =
+        match (scan_duration(&scenarios, "B0"), scan_duration(&scenarios, "S2")) {
+            (Some(b0), Some(s2)) => Some(s2 - b0),
+            _ => None,
+        };
+    let scan_delta_s6_minus_s2 =
+        match (scan_duration(&scenarios, "S2"), scan_duration(&scenarios, "S6")) {
+            (Some(s2), Some(s6)) => Some(s6 - s2),
+            _ => None,
+        };
+    let s5_throughput_multiplier = scenarios
+        .iter()
+        .find(|scenario| scenario.scenario_name == "S5")
+        .and_then(|scenario| {
+            let num_batch_txs = (config.s5_m / config.s5_k.max(1)) as usize;
+            let num_individual_txs = config.s5_m as usize;
+            if scenario.tx_metrics.len() < num_batch_txs + num_individual_txs || num_batch_txs == 0 {
+                return None;
+            }
+            let batch_duration = tx_duration_sum(&scenario.tx_metrics[..num_batch_txs]);
+            let individual_duration = tx_duration_sum(
+                &scenario.tx_metrics[num_batch_txs..num_batch_txs + num_individual_txs],
+            );
+            if batch_duration > 0.0 {
+                Some(individual_duration / batch_duration)
+            } else {
+                None
+            }
+        });
+
+    BenchmarkReport {
+        cpu_model,
+        ram_kb,
+        os,
+        disk_type: "unknown".to_string(),
+        network_path,
+        console_wallet_version: config.console_wallet_version.clone(),
+        minotari_cli_version: config.minotari_cli_version.clone(),
+        base_node_version: config.base_node_version.clone(),
+        scan_delta_s2_minus_b0,
+        scan_delta_s6_minus_s2,
+        s5_throughput_multiplier,
+        wallet_mode,
+        config_snapshot,
+        scenarios,
+    }
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let config_path = std::env::args()
@@ -129,22 +202,16 @@ async fn main() -> anyhow::Result<()> {
             vec![]
         }
     };
-    reports.push(BenchmarkReport {
-        cpu_model: cpu_model.clone(),
+    reports.push(build_report(
+        cpu_model.clone(),
         ram_kb,
-        os: os.clone(),
-        disk_type: "unknown".to_string(),
-        network_path: format!("remote:{}", config.base_node_grpc_url),
-        console_wallet_version: "pinned-see-README".to_string(),
-        minotari_cli_version: "pinned-see-README".to_string(),
-        base_node_version: "pinned-see-README".to_string(),
-        scan_delta_s2_minus_b0: None,
-        scan_delta_s6_minus_s2: None,
-        s5_throughput_multiplier: None,
-        wallet_mode: old_wallet.mode_name().to_string(),
-        config_snapshot: config_snapshot.clone(),
-        scenarios: old_wallet_scenarios,
-    });
+        os.clone(),
+        format!("remote:{}", config.base_node_grpc_url),
+        old_wallet.mode_name().to_string(),
+        config_snapshot.clone(),
+        old_wallet_scenarios,
+        &config,
+    ));
 
     let new_wallet = NewWalletDriver::new(
         require_nonempty_path("minotari_bin_path", &config.minotari_bin_path)?,
@@ -169,22 +236,16 @@ async fn main() -> anyhow::Result<()> {
             ("new_wallet".to_string(), vec![])
         },
     };
-    reports.push(BenchmarkReport {
-        cpu_model: cpu_model.clone(),
+    reports.push(build_report(
+        cpu_model.clone(),
         ram_kb,
-        os: os.clone(),
-        disk_type: "unknown".to_string(),
-        network_path: format!("remote:{}", config.base_node_grpc_url),
-        console_wallet_version: "pinned-see-README".to_string(),
-        minotari_cli_version: "pinned-see-README".to_string(),
-        base_node_version: "pinned-see-README".to_string(),
-        scan_delta_s2_minus_b0: None,
-        scan_delta_s6_minus_s2: None,
-        s5_throughput_multiplier: None,
-        wallet_mode: new_wallet_mode_name,
-        config_snapshot: config_snapshot.clone(),
-        scenarios: new_wallet_scenarios,
-    });
+        os.clone(),
+        format!("remote:{}", config.base_node_grpc_url),
+        new_wallet_mode_name,
+        config_snapshot.clone(),
+        new_wallet_scenarios,
+        &config,
+    ));
 
     let payment_processor = PaymentProcessorDriver::new(
         require_nonempty_path("minotari_bin_path", &config.minotari_bin_path)?,
@@ -212,22 +273,16 @@ async fn main() -> anyhow::Result<()> {
             ("payment_processor".to_string(), vec![])
         },
     };
-    reports.push(BenchmarkReport {
+    reports.push(build_report(
         cpu_model,
         ram_kb,
         os,
-        disk_type: "unknown".to_string(),
-        network_path: format!("remote:{}", config.base_node_grpc_url),
-        console_wallet_version: "pinned-see-README".to_string(),
-        minotari_cli_version: "pinned-see-README".to_string(),
-        base_node_version: "pinned-see-README".to_string(),
-        scan_delta_s2_minus_b0: None,
-        scan_delta_s6_minus_s2: None,
-        s5_throughput_multiplier: None,
-        wallet_mode: payment_processor_mode_name,
+        format!("remote:{}", config.base_node_grpc_url),
+        payment_processor_mode_name,
         config_snapshot,
-        scenarios: payment_processor_scenarios,
-    });
+        payment_processor_scenarios,
+        &config,
+    ));
 
     let report_path = std::env::current_dir()
         .context("failed to resolve current working directory for report output")?

@@ -13,6 +13,9 @@ Edit `config.toml` before running:
 - `payment_processor_data_dir`  directory for payment processor data
 - `base_node_grpc_url`  e.g. "http://127.0.0.1:18142"
 - `base_node_http_url`  e.g. "http://127.0.0.1:9000"
+- `console_wallet_version`  exact tag or commit for `minotari_console_wallet`
+- `minotari_cli_version`  exact tag or commit for `minotari`
+- `base_node_version`  exact tag or commit for the Esmeralda base node
 - `grpc_port`  wallet gRPC port, default 18143
 - `fee_rate`  fee rate in uT/g, leave empty to use wallet default
 - `a_fund`  funding amount in uT per mode (default 10000)
@@ -35,6 +38,7 @@ Structured JSON report containing:
 - Per-scenario metrics for all three wallet modes
 - Balance reconciliation deltas
 - Scan timing comparisons
+- Computed scan deltas and S5 throughput multiplier when scenario data is available
 
 ## Wallet Modes
 - `old_wallet`  minotari_console_wallet via gRPC
