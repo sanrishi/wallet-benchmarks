@@ -276,6 +276,10 @@ impl WalletDriver for OldWalletDriver {
         Ok(resp.scanned_height)
     }
 
+    async fn get_self_address(&self) -> anyhow::Result<String> {
+        self.get_wallet_address().await
+    }
+
     async fn scan_from_genesis(&self) -> anyhow::Result<ScanMetrics> {
         self.scan_from_height(0).await
     }

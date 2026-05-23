@@ -65,17 +65,14 @@ pub async fn run_s1(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
     let mut tx_metrics = Vec::new();
     let fee_rate = parse_fee_rate(config);
     let amount_per_tx = (config.a_fund / config.volume_target.max(1)).max(1);
+    let self_address = driver.get_self_address().await?;
 
     for round in 0..config.doubling_rounds {
         let round_tx_count = 1_u64 << round;
         for tx_index in 0..round_tx_count {
             let tx = attempt_send_single(
                 driver,
-                &synthetic_address(
-                    driver.mode_name(),
-                    "s1-round",
-                    (round_tx_count.saturating_mul(round) + tx_index) as usize,
-                ),
+                &self_address,
                 amount_per_tx,
                 fee_rate,
             )
@@ -104,7 +101,7 @@ pub async fn run_s1(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
     for index in 0..fanout_tx_count {
         let tx = attempt_send_single(
             driver,
-            &synthetic_address(driver.mode_name(), "s1-fanout", index as usize),
+            &self_address,
             amount_per_tx,
             fee_rate,
         )
@@ -186,15 +183,12 @@ pub async fn run_s4(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
     let mut tx_metrics = Vec::new();
     let fee_rate = parse_fee_rate(config);
     let per_tx_timeout = Duration::from_secs(config.s4_t_budget_secs);
+    let self_address = driver.get_self_address().await?;
 
     for batch_size in &config.concurrent_batches {
         let futures = (0..*batch_size)
-            .map(|index| {
-                let address = synthetic_address(
-                    driver.mode_name(),
-                    "s4",
-                    (batch_size.saturating_mul(1000) + index) as usize,
-                );
+            .map(|_| {
+                let address = self_address.clone();
                 async move {
                     match tokio::time::timeout(
                         per_tx_timeout,
@@ -256,20 +250,12 @@ pub async fn run_s5(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
     let mut expected_balance = initial_balance;
     let mut tx_metrics = Vec::new();
     let fee_rate = parse_fee_rate(config);
+    let self_address = driver.get_self_address().await?;
 
     let num_batch_txs = config.s5_m / config.s5_k.max(1);
     for batch_index in 0..num_batch_txs {
         let recipients = (0..config.s5_k)
-            .map(|i| {
-                (
-                    synthetic_address(
-                        driver.mode_name(),
-                        "s5-batch",
-                        (batch_index * config.s5_k + i) as usize,
-                    ),
-                    1_u64,
-                )
-            })
+            .map(|_| (self_address.clone(), 1_u64))
             .collect::<Vec<_>>();
         let tx = attempt_send_batch(driver, recipients.clone(), fee_rate).await;
         if tx.success {
@@ -282,7 +268,7 @@ pub async fn run_s5(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
     for index in 0..config.s5_m {
         let tx = attempt_send_single(
             driver,
-            &synthetic_address(driver.mode_name(), "s5-single", index as usize),
+            &self_address,
             1,
             fee_rate,
         )
@@ -452,6 +438,3 @@ fn parse_fee_rate(config: &Config) -> u64 {
     config.fee_rate.parse::<u64>().unwrap_or(0)
 }
 
-fn synthetic_address(mode: &str, scenario: &str, index: usize) -> String {
-    format!("{mode}-{scenario}-{index}")
-}

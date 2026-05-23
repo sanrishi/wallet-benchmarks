@@ -15,6 +15,9 @@ pub trait WalletDriver: Sync {
     /// Get current chain tip height as seen by wallet
     async fn get_tip_height(&self) -> anyhow::Result<u64>;
 
+    /// Return a valid self address for benchmark self-sends.
+    async fn get_self_address(&self) -> anyhow::Result<String>;
+
     /// Trigger a scan from genesis (birthday = 0)
     async fn scan_from_genesis(&self) -> anyhow::Result<ScanMetrics>;
 

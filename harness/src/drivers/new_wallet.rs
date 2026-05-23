@@ -14,6 +14,7 @@ use tari_common_types::seeds::{
     mnemonic::{Mnemonic, MnemonicLanguage},
     seed_words::SeedWords,
 };
+use tari_common_types::tari_address::{TariAddress, TariAddressFeatures};
 use tari_transaction_components::{
     consensus::ConsensusConstantsBuilder,
     key_manager::{KeyManager, wallet_types::{SeedWordsWallet, WalletType}},
@@ -161,6 +162,26 @@ impl NewWalletDriver {
                 .map_err(|_| anyhow!("failed to construct seed-words wallet for new_wallet"))?,
         );
         KeyManager::new(wallet).context("failed to build key manager for new_wallet")
+    }
+
+    fn self_address_string(&self) -> anyhow::Result<String> {
+        let mnemonic = SeedWords::from_str(&self.seed_words)
+            .context("failed to parse stored seed words for new_wallet address")?;
+        let cipher_seed = CipherSeed::from_mnemonic(&mnemonic, None)
+            .context("failed to reconstruct cipher seed for new_wallet address")?;
+        let wallet = WalletType::SeedWords(
+            SeedWordsWallet::construct_new(cipher_seed)
+                .map_err(|_| anyhow!("failed to construct seed-words wallet for new_wallet address"))?,
+        );
+        let address = TariAddress::new_dual_address(
+            wallet.get_public_view_key(),
+            wallet.get_public_spend_key(),
+            Network::Esmeralda,
+            TariAddressFeatures::create_one_sided_only(),
+            None,
+        )
+        .context("failed to construct new_wallet self address")?;
+        Ok(address.to_base58())
     }
 
     async fn submit_signed_transaction(
@@ -326,6 +347,10 @@ impl WalletDriver for NewWalletDriver {
             .context("failed to parse get_tip_info response")?;
 
         Ok(tip.metadata.best_block_height)
+    }
+
+    async fn get_self_address(&self) -> anyhow::Result<String> {
+        self.self_address_string()
     }
 
     async fn scan_from_genesis(&self) -> anyhow::Result<ScanMetrics> {
