@@ -41,4 +41,10 @@ pub trait WalletDriver: Sync {
     ) -> anyhow::Result<TxMetrics> {
         Err(anyhow::anyhow!("send_batch not supported by this driver"))
     }
+
+    /// Observe externally funded incoming funds and return timing metrics for when they first
+    /// became visible and when they reached spendable depth.
+    async fn observe_funding(&self, _expected_amount_ut: u64) -> anyhow::Result<TxMetrics> {
+        Err(anyhow::anyhow!("observe_funding not supported by this driver"))
+    }
 }

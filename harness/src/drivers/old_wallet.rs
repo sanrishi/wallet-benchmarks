@@ -362,6 +362,31 @@ impl OldWalletDriver {
             error: None,
         })
     }
+
+    async fn latest_incoming_tx_id(&self, expected_amount_ut: u64) -> anyhow::Result<Option<String>> {
+        use tari_rpc::wallet_client::WalletClient;
+        use tari_rpc::GetAllCompletedTransactionsRequest;
+
+        let mut client = WalletClient::connect(self.grpc_url.clone()).await?;
+        let response = client
+            .get_all_completed_transactions(GetAllCompletedTransactionsRequest {
+                offset: 0,
+                limit: 50,
+                status_bitflag: 0,
+            })
+            .await?
+            .into_inner();
+
+        Ok(response
+            .transactions
+            .into_iter()
+            .filter(|tx| {
+                tx.direction == tari_rpc::TransactionDirection::Inbound as i32
+                    && tx.amount >= expected_amount_ut
+            })
+            .max_by_key(|tx| tx.timestamp)
+            .map(|tx| tx.tx_id.to_string()))
+    }
 }
 
 #[async_trait]
@@ -463,5 +488,59 @@ impl WalletDriver for OldWalletDriver {
         fee_rate: u64,
     ) -> anyhow::Result<TxMetrics> {
         self.transfer_recipients(recipients, fee_rate).await
+    }
+
+    async fn observe_funding(&self, expected_amount_ut: u64) -> anyhow::Result<TxMetrics> {
+        use tari_rpc::GetStateRequest;
+        use tari_rpc::wallet_client::WalletClient;
+
+        let started_at = Instant::now();
+        let deadline = started_at + Duration::from_secs(600);
+        let mut first_seen_pending_at = None;
+        let mut observed_tx_id = None;
+
+        loop {
+            if Instant::now() > deadline {
+                return Err(anyhow!(
+                    "incoming funding of at least {expected_amount_ut} uT was not observed within 600s"
+                ));
+            }
+
+            let mut client = WalletClient::connect(self.grpc_url.clone()).await?;
+            let state = client
+                .get_state(GetStateRequest {})
+                .await?
+                .into_inner();
+            let balance = state
+                .balance
+                .ok_or_else(|| anyhow!("wallet state returned no balance"))?;
+
+            if observed_tx_id.is_none() {
+                observed_tx_id = self.latest_incoming_tx_id(expected_amount_ut).await?;
+            }
+
+            if first_seen_pending_at.is_none()
+                && (balance.pending_incoming_balance >= expected_amount_ut
+                    || balance.available_balance >= expected_amount_ut)
+            {
+                first_seen_pending_at = Some(started_at.elapsed().as_secs_f64());
+            }
+
+            if balance.available_balance >= expected_amount_ut {
+                let mempool_secs =
+                    first_seen_pending_at.unwrap_or_else(|| started_at.elapsed().as_secs_f64());
+                return Ok(TxMetrics {
+                    tx_id: observed_tx_id.unwrap_or_else(|| "incoming-funding".to_string()),
+                    construction_secs: 0.0,
+                    broadcast_to_mempool_secs: mempool_secs,
+                    broadcast_to_confirmed_secs: started_at.elapsed().as_secs_f64(),
+                    fee_paid: 0,
+                    success: true,
+                    error: None,
+                });
+            }
+
+            tokio::time::sleep(Duration::from_secs(2)).await;
+        }
     }
 }

@@ -464,6 +464,67 @@ impl NewWalletDriver {
         }
     }
 
+    fn account_id(&self) -> anyhow::Result<i64> {
+        let connection = Connection::open(self.database_path())
+            .context("failed to open new_wallet database for account lookup")?;
+        connection
+            .query_row(
+                "SELECT id FROM accounts WHERE friendly_name = ?1 LIMIT 1",
+                [DEFAULT_ACCOUNT_NAME],
+                |row| row.get(0),
+            )
+            .context("failed to query default account id from new_wallet database")
+    }
+
+    fn get_balance_state(&self) -> anyhow::Result<(u64, u64)> {
+        let connection = Connection::open(self.database_path())
+            .context("failed to open new_wallet database for balance state")?;
+        let account_id = self.account_id()?;
+        let (total_credits, total_debits): (i64, i64) = connection
+            .query_row(
+                "SELECT COALESCE(SUM(balance_credit), 0), COALESCE(SUM(balance_debit), 0) FROM balance_changes WHERE account_id = ?1",
+                [account_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .context("failed to query balance aggregates from new_wallet database")?;
+        let (locked_val, unconfirmed_val, locked_and_unconfirmed_val): (i64, i64, i64) = connection
+            .query_row(
+                "SELECT \
+                    COALESCE(SUM(CASE WHEN status = 'locked' THEN value ELSE 0 END), 0), \
+                    COALESCE(SUM(CASE WHEN confirmed_height IS NULL THEN value ELSE 0 END), 0), \
+                    COALESCE(SUM(CASE WHEN status = 'locked' AND confirmed_height IS NULL THEN value ELSE 0 END), 0) \
+                 FROM outputs WHERE account_id = ?1 AND deleted_at IS NULL AND is_burn = 0",
+                [account_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .context("failed to query output totals from new_wallet database")?;
+
+        let total_balance = (total_credits - total_debits).max(0) as u64;
+        let unavailable = (locked_val + unconfirmed_val - locked_and_unconfirmed_val).max(0) as u64;
+        let available = total_balance.saturating_sub(unavailable);
+        let unconfirmed = unconfirmed_val.max(0) as u64;
+        Ok((available, unconfirmed))
+    }
+
+    fn latest_incoming_transaction(
+        &self,
+        expected_amount_ut: u64,
+    ) -> anyhow::Result<Option<(String, String)>> {
+        let connection = Connection::open(self.database_path())
+            .context("failed to open new_wallet database for displayed transaction lookup")?;
+        let account_id = self.account_id()?;
+        connection
+            .query_row(
+                "SELECT id, status FROM displayed_transactions \
+                 WHERE account_id = ?1 AND direction = 'incoming' AND amount >= ?2 \
+                 ORDER BY updated_at DESC, block_height DESC, id DESC LIMIT 1",
+                rusqlite::params![account_id, expected_amount_ut as i64],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()
+            .context("failed to query latest incoming displayed transaction from new_wallet database")
+    }
+
     async fn send_recipients(
         &self,
         recipients: Vec<(String, u64)>,
@@ -630,6 +691,55 @@ impl WalletDriver for NewWalletDriver {
         _fee_rate: u64,
     ) -> anyhow::Result<TxMetrics> {
         self.send_recipients(recipients).await
+    }
+
+    async fn observe_funding(&self, expected_amount_ut: u64) -> anyhow::Result<TxMetrics> {
+        let started_at = Instant::now();
+        let deadline = started_at + Duration::from_secs(600);
+        let mut first_seen_pending_at = None;
+
+        loop {
+            if Instant::now() > deadline {
+                return Err(anyhow!(
+                    "incoming funding of at least {expected_amount_ut} uT was not observed within 600s"
+                ));
+            }
+
+            self.refresh_transaction_state().await?;
+            let (available, unconfirmed) = self.get_balance_state()?;
+            let incoming = self.latest_incoming_transaction(expected_amount_ut)?;
+
+            if first_seen_pending_at.is_none()
+                && (unconfirmed >= expected_amount_ut
+                    || incoming
+                        .as_ref()
+                        .is_some_and(|(_, status)| status == "pending" || status == "unconfirmed" || status == "confirmed")
+                    || available >= expected_amount_ut)
+            {
+                first_seen_pending_at = Some(started_at.elapsed().as_secs_f64());
+            }
+
+            if available >= expected_amount_ut
+                || incoming
+                    .as_ref()
+                    .is_some_and(|(_, status)| status == "confirmed")
+            {
+                return Ok(TxMetrics {
+                    tx_id: incoming
+                        .map(|(tx_id, _)| tx_id)
+                        .unwrap_or_else(|| "incoming-funding".to_string()),
+                    construction_secs: 0.0,
+                    broadcast_to_mempool_secs: first_seen_pending_at
+                        .unwrap_or_else(|| started_at.elapsed().as_secs_f64()),
+                    broadcast_to_confirmed_secs: started_at.elapsed().as_secs_f64(),
+                    fee_paid: 0,
+                    success: true,
+                    error: None,
+                });
+            }
+
+            tokio::time::sleep(Duration::from_secs(2)).await;
+        }
     }
 }
 

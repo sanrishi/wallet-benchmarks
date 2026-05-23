@@ -31,29 +31,31 @@ pub async fn run_b0(driver: &dyn WalletDriver) -> anyhow::Result<ScenarioResult>
 pub async fn run_s0(driver: &dyn WalletDriver, config: &Config) -> anyhow::Result<ScenarioResult> {
     let started_at = Instant::now();
     let h_birth = driver.get_tip_height().await?;
-    let deadline = Instant::now() + Duration::from_secs(CONFIRMATION_TIMEOUT_SECS);
-    loop {
-        let balance = driver.get_balance().await?;
-        if balance >= config.a_fund {
-            break;
-        }
-        if Instant::now() > deadline {
-            break;
-        }
-        tokio::time::sleep(Duration::from_millis(POLL_INTERVAL_MS)).await;
-    }
+    let funding_tx = match driver.observe_funding(config.a_fund).await {
+        Ok(tx) => tx,
+        Err(error) => TxMetrics {
+            tx_id: "incoming-funding".to_string(),
+            construction_secs: 0.0,
+            broadcast_to_mempool_secs: 0.0,
+            broadcast_to_confirmed_secs: started_at.elapsed().as_secs_f64(),
+            fee_paid: 0,
+            success: false,
+            error: Some(error.to_string()),
+        },
+    };
     let observed_balance = driver.get_balance().await?;
     let tip_after = driver.get_tip_height().await?;
     let _ = (h_birth, tip_after);
+    let success = funding_tx.success && observed_balance >= config.a_fund;
 
     Ok(ScenarioResult {
         scenario_name: "S0".to_string(),
         wall_clock_secs: started_at.elapsed().as_secs_f64(),
         total_fees: 0,
-        success_count: u64::from(observed_balance >= config.a_fund),
-        failure_count: u64::from(observed_balance < config.a_fund),
+        success_count: u64::from(success),
+        failure_count: u64::from(!success),
         balance_delta: config.a_fund as i64 - observed_balance as i64,
-        tx_metrics: Vec::new(),
+        tx_metrics: vec![funding_tx],
         scan_metrics: None,
     })
 }
