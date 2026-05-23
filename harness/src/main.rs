@@ -150,6 +150,7 @@ async fn main() -> anyhow::Result<()> {
         require_nonempty_path("minotari_bin_path", &config.minotari_bin_path)?,
         require_nonempty_path("new_wallet_data_dir", &config.new_wallet_data_dir)?,
         config.base_node_http_url.clone(),
+        config.new_wallet_password.clone(),
     );
     let (new_wallet_mode_name, new_wallet_scenarios) = match new_wallet {
         Ok(new_wallet) => {
@@ -192,6 +193,7 @@ async fn main() -> anyhow::Result<()> {
             &config.payment_processor_data_dir,
         )?,
         config.base_node_http_url.clone(),
+        config.payment_processor_password.clone(),
     );
     let (payment_processor_mode_name, payment_processor_scenarios) = match payment_processor {
         Ok(payment_processor) => {

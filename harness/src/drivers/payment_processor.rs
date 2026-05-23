@@ -30,7 +30,6 @@ use tokio::process::Command;
 use crate::driver::WalletDriver;
 use crate::metrics::{ScanMetrics, TxMetrics};
 
-const DEFAULT_WALLET_PASSWORD: &str = "benchmark_mode3_password_32_chars";
 const DEFAULT_ACCOUNT_NAME: &str = "default";
 
 pub struct PaymentProcessorDriver {
@@ -43,7 +42,12 @@ pub struct PaymentProcessorDriver {
 }
 
 impl PaymentProcessorDriver {
-    pub fn new(minotari_bin: PathBuf, data_dir: PathBuf, base_node_url: String) -> anyhow::Result<Self> {
+    pub fn new(
+        minotari_bin: PathBuf,
+        data_dir: PathBuf,
+        base_node_url: String,
+        password: String,
+    ) -> anyhow::Result<Self> {
         fs::create_dir_all(&data_dir)
             .with_context(|| format!("failed to create {}", data_dir.display()))?;
         let seed_words = Self::load_or_create_seed_words(&data_dir)?;
@@ -53,7 +57,7 @@ impl PaymentProcessorDriver {
             data_dir,
             base_node_url,
             http_client: Client::new(),
-            password: DEFAULT_WALLET_PASSWORD.to_string(),
+            password,
             seed_words,
         })
     }

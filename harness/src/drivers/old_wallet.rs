@@ -235,7 +235,7 @@ impl WalletDriver for OldWalletDriver {
                         ) || error.raw_os_error() == Some(32) =>
                     {
                         last_error = Some(error);
-                        std::thread::sleep(Duration::from_millis(500));
+                        tokio::time::sleep(Duration::from_millis(500)).await;
                         continue;
                     }
                     Err(error) => return Err(error.into()),
@@ -244,7 +244,7 @@ impl WalletDriver for OldWalletDriver {
 
             match fs::create_dir_all(&self.data_dir) {
                 Ok(()) => {
-                    std::thread::sleep(Duration::from_millis(500));
+                    tokio::time::sleep(Duration::from_millis(500)).await;
                     return Ok(());
                 }
                 Err(error)
@@ -254,7 +254,7 @@ impl WalletDriver for OldWalletDriver {
                     ) || error.raw_os_error() == Some(32) =>
                 {
                     last_error = Some(error);
-                    std::thread::sleep(Duration::from_millis(500));
+                    tokio::time::sleep(Duration::from_millis(500)).await;
                 }
                 Err(error) => return Err(error.into()),
             }
