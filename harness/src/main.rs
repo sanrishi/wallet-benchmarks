@@ -38,25 +38,27 @@ async fn run_old_wallet_scenarios(
     scenarios.push(run_b0(&*guard.driver).await?);
     scenarios.push(run_s0(&*guard.driver, config).await?);
     scenarios.push(run_s1(&*guard.driver, config).await?);
+    let post_s1_balance = guard.driver.get_balance().await?;
 
     let h_birth = guard.driver.get_tip_height().await.unwrap_or(0);
 
     restart_old_wallet_for_scan(guard.driver).await?;
-    scenarios.push(run_s2(&*guard.driver).await?);
+    scenarios.push(run_s2(&*guard.driver, post_s1_balance).await?);
 
     restart_old_wallet_for_scan(guard.driver).await?;
-    scenarios.push(run_s3(&*guard.driver, h_birth).await?);
+    scenarios.push(run_s3(&*guard.driver, h_birth, post_s1_balance).await?);
 
     scenarios.push(run_s4(&*guard.driver, config).await?);
     scenarios.push(run_s5(&*guard.driver, config).await?);
+    let post_s5_balance = guard.driver.get_balance().await?;
 
     let h_birth_after_s5 = guard.driver.get_tip_height().await.unwrap_or(h_birth);
 
     restart_old_wallet_for_scan(guard.driver).await?;
-    scenarios.push(run_s6(&*guard.driver).await?);
+    scenarios.push(run_s6(&*guard.driver, post_s5_balance).await?);
 
     restart_old_wallet_for_scan(guard.driver).await?;
-    scenarios.push(run_s7(&*guard.driver, h_birth_after_s5).await?);
+    scenarios.push(run_s7(&*guard.driver, h_birth_after_s5, post_s5_balance).await?);
 
     Ok(scenarios)
 }

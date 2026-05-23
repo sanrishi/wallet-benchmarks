@@ -133,40 +133,43 @@ pub async fn run_s1(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
     ))
 }
 
-pub async fn run_s2(driver: &dyn WalletDriver) -> anyhow::Result<ScenarioResult> {
+pub async fn run_s2(
+    driver: &dyn WalletDriver,
+    expected_balance: u64,
+) -> anyhow::Result<ScenarioResult> {
     let started_at = Instant::now();
     let scan_metrics = driver.scan_from_genesis().await?;
     let observed_balance = driver.get_balance().await?;
-    let expected_balance = observed_balance;
-    let success_count = u64::from(scan_metrics.outputs_found >= REDISCOVERY_TARGET);
-    let failure_count = u64::from(scan_metrics.outputs_found < REDISCOVERY_TARGET);
+    let success = scan_metrics.outputs_found >= REDISCOVERY_TARGET && observed_balance == expected_balance;
 
     Ok(ScenarioResult {
         scenario_name: "S2".to_string(),
         wall_clock_secs: started_at.elapsed().as_secs_f64(),
         total_fees: 0,
-        success_count,
-        failure_count,
+        success_count: u64::from(success),
+        failure_count: u64::from(!success),
         balance_delta: expected_balance as i64 - observed_balance as i64,
         tx_metrics: Vec::new(),
         scan_metrics: Some(scan_metrics),
     })
 }
 
-pub async fn run_s3(driver: &dyn WalletDriver, h_birth: u64) -> anyhow::Result<ScenarioResult> {
+pub async fn run_s3(
+    driver: &dyn WalletDriver,
+    h_birth: u64,
+    expected_balance: u64,
+) -> anyhow::Result<ScenarioResult> {
     let started_at = Instant::now();
     let scan_metrics = driver.scan_from_birthday(h_birth).await?;
     let observed_balance = driver.get_balance().await?;
-    let expected_balance = observed_balance;
-    let success_count = u64::from(scan_metrics.outputs_found >= REDISCOVERY_TARGET);
-    let failure_count = u64::from(scan_metrics.outputs_found < REDISCOVERY_TARGET);
+    let success = scan_metrics.outputs_found >= REDISCOVERY_TARGET && observed_balance == expected_balance;
 
     Ok(ScenarioResult {
         scenario_name: "S3".to_string(),
         wall_clock_secs: started_at.elapsed().as_secs_f64(),
         total_fees: 0,
-        success_count,
-        failure_count,
+        success_count: u64::from(success),
+        failure_count: u64::from(!success),
         balance_delta: expected_balance as i64 - observed_balance as i64,
         tx_metrics: Vec::new(),
         scan_metrics: Some(scan_metrics),
@@ -287,36 +290,43 @@ pub async fn run_s5(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
     ))
 }
 
-pub async fn run_s6(driver: &dyn WalletDriver) -> anyhow::Result<ScenarioResult> {
+pub async fn run_s6(
+    driver: &dyn WalletDriver,
+    expected_balance: u64,
+) -> anyhow::Result<ScenarioResult> {
     let started_at = Instant::now();
     let scan_metrics = driver.scan_from_genesis().await?;
     let observed_balance = driver.get_balance().await?;
-    let expected_balance = observed_balance;
+    let success = observed_balance == expected_balance;
 
     Ok(ScenarioResult {
         scenario_name: "S6".to_string(),
         wall_clock_secs: started_at.elapsed().as_secs_f64(),
         total_fees: 0,
-        success_count: 1,
-        failure_count: 0,
+        success_count: u64::from(success),
+        failure_count: u64::from(!success),
         balance_delta: expected_balance as i64 - observed_balance as i64,
         tx_metrics: Vec::new(),
         scan_metrics: Some(scan_metrics),
     })
 }
 
-pub async fn run_s7(driver: &dyn WalletDriver, h_birth: u64) -> anyhow::Result<ScenarioResult> {
+pub async fn run_s7(
+    driver: &dyn WalletDriver,
+    h_birth: u64,
+    expected_balance: u64,
+) -> anyhow::Result<ScenarioResult> {
     let started_at = Instant::now();
     let scan_metrics = driver.scan_from_birthday(h_birth).await?;
     let observed_balance = driver.get_balance().await?;
-    let expected_balance = observed_balance;
+    let success = observed_balance == expected_balance;
 
     Ok(ScenarioResult {
         scenario_name: "S7".to_string(),
         wall_clock_secs: started_at.elapsed().as_secs_f64(),
         total_fees: 0,
-        success_count: 1,
-        failure_count: 0,
+        success_count: u64::from(success),
+        failure_count: u64::from(!success),
         balance_delta: expected_balance as i64 - observed_balance as i64,
         tx_metrics: Vec::new(),
         scan_metrics: Some(scan_metrics),
@@ -332,16 +342,18 @@ pub async fn run_all_scenarios(
     scenarios.push(run_b0(driver).await?);
     scenarios.push(run_s0(driver, config).await?);
     scenarios.push(run_s1(driver, config).await?);
+    let post_s1_balance = driver.get_balance().await?;
 
     let h_birth = driver.get_tip_height().await.unwrap_or(0);
-    scenarios.push(run_s2(driver).await?);
-    scenarios.push(run_s3(driver, h_birth).await?);
+    scenarios.push(run_s2(driver, post_s1_balance).await?);
+    scenarios.push(run_s3(driver, h_birth, post_s1_balance).await?);
     scenarios.push(run_s4(driver, config).await?);
     scenarios.push(run_s5(driver, config).await?);
+    let post_s5_balance = driver.get_balance().await?;
 
     let h_birth_after_s5 = driver.get_tip_height().await.unwrap_or(h_birth);
-    scenarios.push(run_s6(driver).await?);
-    scenarios.push(run_s7(driver, h_birth_after_s5).await?);
+    scenarios.push(run_s6(driver, post_s5_balance).await?);
+    scenarios.push(run_s7(driver, h_birth_after_s5, post_s5_balance).await?);
 
     Ok(scenarios)
 }
