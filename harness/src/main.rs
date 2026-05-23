@@ -11,9 +11,11 @@ use std::path::PathBuf;
 use anyhow::Context;
 use config::Config;
 use driver::WalletDriver;
+use drivers::new_wallet::NewWalletDriver;
 use drivers::old_wallet::OldWalletDriver;
+use drivers::payment_processor::PaymentProcessorDriver;
 use metrics::{BenchmarkReport, ScenarioResult};
-use scenarios::{run_b0, run_s0, run_s1, run_s2, run_s3, run_s4, run_s5, run_s6, run_s7};
+use scenarios::{run_all_scenarios, run_b0, run_s0, run_s1, run_s2, run_s3, run_s4, run_s5, run_s6, run_s7};
 use sysinfo::System;
 
 struct OldWalletGuard<'a> {
@@ -137,51 +139,83 @@ async fn main() -> anyhow::Result<()> {
         scenarios: old_wallet_scenarios,
     });
 
-    // Mode 2 is disabled for MVP baseline runs until NewWalletDriver is implemented.
-    // let new_wallet = NewWalletDriver::new(
-    //     PathBuf::from(&config.new_wallet_data_dir),
-    //     config.base_node_http_url.clone(),
-    // );
-    // let new_wallet_scenarios = run_all_scenarios(&new_wallet, &config).await?;
-    // reports.push(BenchmarkReport {
-    //     cpu_model: cpu_model.clone(),
-    //     ram_kb,
-    //     os: os.clone(),
-    //     disk_type: "unknown".to_string(),
-    //     network_path: format!("remote:{}", config.base_node_grpc_url),
-    //     console_wallet_version: "pinned-see-README".to_string(),
-    //     minotari_cli_version: "pinned-see-README".to_string(),
-    //     base_node_version: "pinned-see-README".to_string(),
-    //     scan_delta_s2_minus_b0: None,
-    //     scan_delta_s6_minus_s2: None,
-    //     s5_throughput_multiplier: None,
-    //     wallet_mode: new_wallet.mode_name().to_string(),
-    //     config_snapshot: config_snapshot.clone(),
-    //     scenarios: new_wallet_scenarios,
-    // });
+    let new_wallet = NewWalletDriver::new(
+        PathBuf::from(&config.minotari_bin_path),
+        PathBuf::from(&config.new_wallet_data_dir),
+        config.base_node_http_url.clone(),
+    );
+    let (new_wallet_mode_name, new_wallet_scenarios) = match new_wallet {
+        Ok(new_wallet) => {
+            let mode_name = new_wallet.mode_name().to_string();
+            let scenarios = match run_all_scenarios(&new_wallet, &config).await {
+                Ok(scenarios) => scenarios,
+                Err(error) => {
+                    eprintln!("new_wallet failed: {error}");
+                    vec![]
+                },
+            };
+            (mode_name, scenarios)
+        },
+        Err(error) => {
+            eprintln!("new_wallet initialization failed: {error}");
+            ("new_wallet".to_string(), vec![])
+        },
+    };
+    reports.push(BenchmarkReport {
+        cpu_model: cpu_model.clone(),
+        ram_kb,
+        os: os.clone(),
+        disk_type: "unknown".to_string(),
+        network_path: format!("remote:{}", config.base_node_grpc_url),
+        console_wallet_version: "pinned-see-README".to_string(),
+        minotari_cli_version: "pinned-see-README".to_string(),
+        base_node_version: "pinned-see-README".to_string(),
+        scan_delta_s2_minus_b0: None,
+        scan_delta_s6_minus_s2: None,
+        s5_throughput_multiplier: None,
+        wallet_mode: new_wallet_mode_name,
+        config_snapshot: config_snapshot.clone(),
+        scenarios: new_wallet_scenarios,
+    });
 
-    // Mode 3 is disabled for MVP baseline runs until PaymentProcessorDriver is implemented.
-    // let payment_processor = PaymentProcessorDriver::new(
-    //     PathBuf::from(&config.payment_processor_data_dir),
-    //     config.base_node_http_url.clone(),
-    // );
-    // let payment_processor_scenarios = run_all_scenarios(&payment_processor, &config).await?;
-    // reports.push(BenchmarkReport {
-    //     cpu_model,
-    //     ram_kb,
-    //     os,
-    //     disk_type: "unknown".to_string(),
-    //     network_path: format!("remote:{}", config.base_node_grpc_url),
-    //     console_wallet_version: "pinned-see-README".to_string(),
-    //     minotari_cli_version: "pinned-see-README".to_string(),
-    //     base_node_version: "pinned-see-README".to_string(),
-    //     scan_delta_s2_minus_b0: None,
-    //     scan_delta_s6_minus_s2: None,
-    //     s5_throughput_multiplier: None,
-    //     wallet_mode: payment_processor.mode_name().to_string(),
-    //     config_snapshot,
-    //     scenarios: payment_processor_scenarios,
-    // });
+    let payment_processor = PaymentProcessorDriver::new(
+        PathBuf::from(&config.minotari_bin_path),
+        PathBuf::from(&config.payment_processor_data_dir),
+        config.base_node_http_url.clone(),
+    );
+    let (payment_processor_mode_name, payment_processor_scenarios) = match payment_processor {
+        Ok(payment_processor) => {
+            let mode_name = payment_processor.mode_name().to_string();
+            let scenarios = match run_all_scenarios(&payment_processor, &config).await {
+                Ok(scenarios) => scenarios,
+                Err(error) => {
+                    eprintln!("payment_processor failed: {error}");
+                    vec![]
+                },
+            };
+            (mode_name, scenarios)
+        },
+        Err(error) => {
+            eprintln!("payment_processor initialization failed: {error}");
+            ("payment_processor".to_string(), vec![])
+        },
+    };
+    reports.push(BenchmarkReport {
+        cpu_model,
+        ram_kb,
+        os,
+        disk_type: "unknown".to_string(),
+        network_path: format!("remote:{}", config.base_node_grpc_url),
+        console_wallet_version: "pinned-see-README".to_string(),
+        minotari_cli_version: "pinned-see-README".to_string(),
+        base_node_version: "pinned-see-README".to_string(),
+        scan_delta_s2_minus_b0: None,
+        scan_delta_s6_minus_s2: None,
+        s5_throughput_multiplier: None,
+        wallet_mode: payment_processor_mode_name,
+        config_snapshot,
+        scenarios: payment_processor_scenarios,
+    });
 
     let report_path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("..")
