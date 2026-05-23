@@ -80,6 +80,14 @@ async fn print_old_wallet_address(old_wallet: &OldWalletDriver) {
     }
 }
 
+fn require_nonempty_path(label: &str, value: &str) -> anyhow::Result<PathBuf> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Err(anyhow::anyhow!("{label} must not be empty"));
+    }
+    Ok(PathBuf::from(trimmed))
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let config_path = std::env::args()
@@ -110,8 +118,8 @@ async fn main() -> anyhow::Result<()> {
     let mut reports = Vec::new();
 
     let mut old_wallet = OldWalletDriver::new(
-        PathBuf::from(&config.wallet_bin_path),
-        PathBuf::from(&config.old_wallet_data_dir),
+        require_nonempty_path("wallet_bin_path", &config.wallet_bin_path)?,
+        require_nonempty_path("old_wallet_data_dir", &config.old_wallet_data_dir)?,
         config.old_wallet_password.clone(),
         config.grpc_port,
     );
@@ -140,8 +148,8 @@ async fn main() -> anyhow::Result<()> {
     });
 
     let new_wallet = NewWalletDriver::new(
-        PathBuf::from(&config.minotari_bin_path),
-        PathBuf::from(&config.new_wallet_data_dir),
+        require_nonempty_path("minotari_bin_path", &config.minotari_bin_path)?,
+        require_nonempty_path("new_wallet_data_dir", &config.new_wallet_data_dir)?,
         config.base_node_http_url.clone(),
     );
     let (new_wallet_mode_name, new_wallet_scenarios) = match new_wallet {
@@ -179,8 +187,11 @@ async fn main() -> anyhow::Result<()> {
     });
 
     let payment_processor = PaymentProcessorDriver::new(
-        PathBuf::from(&config.minotari_bin_path),
-        PathBuf::from(&config.payment_processor_data_dir),
+        require_nonempty_path("minotari_bin_path", &config.minotari_bin_path)?,
+        require_nonempty_path(
+            "payment_processor_data_dir",
+            &config.payment_processor_data_dir,
+        )?,
         config.base_node_http_url.clone(),
     );
     let (payment_processor_mode_name, payment_processor_scenarios) = match payment_processor {
