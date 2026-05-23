@@ -1,4 +1,4 @@
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct ScanMetrics {
     pub wall_clock_secs: f64,
     pub blocks_per_sec: f64,
@@ -9,7 +9,7 @@ pub struct ScanMetrics {
     pub peak_cpu_percent: f64,
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct TxMetrics {
     pub tx_id: String,
     pub construction_secs: f64,

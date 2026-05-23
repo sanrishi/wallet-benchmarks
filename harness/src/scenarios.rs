@@ -449,3 +449,244 @@ fn parse_fee_rate(config: &Config) -> u64 {
     config.fee_rate.parse::<u64>().unwrap_or(0)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use async_trait::async_trait;
+    use std::collections::VecDeque;
+    use std::sync::{Arc, Mutex};
+
+    #[derive(Clone)]
+    struct FakeDriver {
+        state: Arc<Mutex<FakeState>>,
+    }
+
+    struct FakeState {
+        balance_values: VecDeque<u64>,
+        scan_outputs_found: u64,
+        single_calls: usize,
+        batch_calls: Vec<usize>,
+        funding_result: anyhow::Result<TxMetrics>,
+        send_single_result: anyhow::Result<TxMetrics>,
+        send_batch_result: anyhow::Result<TxMetrics>,
+    }
+
+    impl FakeDriver {
+        fn new() -> Self {
+            Self {
+                state: Arc::new(Mutex::new(FakeState {
+                    balance_values: VecDeque::from([10_000, 10_000]),
+                    scan_outputs_found: REDISCOVERY_TARGET,
+                    single_calls: 0,
+                    batch_calls: Vec::new(),
+                    funding_result: Ok(sample_tx_metric("funding")),
+                    send_single_result: Ok(sample_tx_metric("single")),
+                    send_batch_result: Ok(sample_tx_metric("batch")),
+                })),
+            }
+        }
+
+        fn with_balances(self, balances: impl Into<VecDeque<u64>>) -> Self {
+            self.state.lock().unwrap().balance_values = balances.into();
+            self
+        }
+
+        fn with_scan_outputs(self, outputs_found: u64) -> Self {
+            self.state.lock().unwrap().scan_outputs_found = outputs_found;
+            self
+        }
+
+        fn with_funding_result(self, result: anyhow::Result<TxMetrics>) -> Self {
+            self.state.lock().unwrap().funding_result = result;
+            self
+        }
+    }
+
+    #[async_trait]
+    impl WalletDriver for FakeDriver {
+        fn mode_name(&self) -> &str { "fake" }
+
+        async fn reset(&self) -> anyhow::Result<()> { Ok(()) }
+
+        async fn get_balance(&self) -> anyhow::Result<u64> {
+            let mut state = self.state.lock().unwrap();
+            if state.balance_values.len() > 1 {
+                Ok(state.balance_values.pop_front().unwrap())
+            } else {
+                Ok(*state.balance_values.front().unwrap_or(&0))
+            }
+        }
+
+        async fn get_tip_height(&self) -> anyhow::Result<u64> { Ok(123) }
+
+        async fn get_self_address(&self) -> anyhow::Result<String> {
+            Ok("faux-self-address".to_string())
+        }
+
+        async fn scan_from_genesis(&self) -> anyhow::Result<crate::metrics::ScanMetrics> {
+            let outputs_found = self.state.lock().unwrap().scan_outputs_found;
+            Ok(sample_scan_metrics(outputs_found))
+        }
+
+        async fn scan_from_birthday(&self, _height: u64) -> anyhow::Result<crate::metrics::ScanMetrics> {
+            let outputs_found = self.state.lock().unwrap().scan_outputs_found;
+            Ok(sample_scan_metrics(outputs_found))
+        }
+
+        async fn send_single(
+            &self,
+            _to_address: &str,
+            _amount_ut: u64,
+            _fee_rate: u64,
+        ) -> anyhow::Result<TxMetrics> {
+            let mut state = self.state.lock().unwrap();
+            state.single_calls += 1;
+            state
+                .send_single_result
+                .as_ref()
+                .map(|tx| tx.clone())
+                .map_err(|e| anyhow!(e.to_string()))
+        }
+
+        async fn send_batch(
+            &self,
+            recipients: Vec<(String, u64)>,
+            _fee_rate: u64,
+        ) -> anyhow::Result<TxMetrics> {
+            let mut state = self.state.lock().unwrap();
+            state.batch_calls.push(recipients.len());
+            state
+                .send_batch_result
+                .as_ref()
+                .map(|tx| tx.clone())
+                .map_err(|e| anyhow!(e.to_string()))
+        }
+
+        async fn observe_funding(&self, _expected_amount_ut: u64) -> anyhow::Result<TxMetrics> {
+            self.state
+                .lock()
+                .unwrap()
+                .funding_result
+                .as_ref()
+                .map(|tx| tx.clone())
+                .map_err(|e| anyhow!(e.to_string()))
+        }
+    }
+
+    fn sample_tx_metric(tx_id: &str) -> TxMetrics {
+        TxMetrics {
+            tx_id: tx_id.to_string(),
+            construction_secs: 0.1,
+            broadcast_to_mempool_secs: 0.2,
+            broadcast_to_confirmed_secs: 0.3,
+            fee_paid: 1,
+            success: true,
+            error: None,
+        }
+    }
+
+    fn sample_scan_metrics(outputs_found: u64) -> crate::metrics::ScanMetrics {
+        crate::metrics::ScanMetrics {
+            wall_clock_secs: 1.0,
+            blocks_per_sec: 100.0,
+            h_tip_start: 10,
+            h_tip_end: 20,
+            outputs_found,
+            peak_rss_kb: 0,
+            peak_cpu_percent: 0.0,
+        }
+    }
+
+    fn sample_config() -> Config {
+        Config {
+            a_fund: 10_000,
+            c_min: 3,
+            volume_target: 512,
+            doubling_rounds: 2,
+            fanout_outputs_per_tx: 3,
+            concurrent_batches: vec![2],
+            s4_t_budget_secs: 60,
+            s5_m: 12,
+            s5_k: 3,
+            fee_rate: "1".to_string(),
+            base_node_grpc_url: String::new(),
+            base_node_http_url: String::new(),
+            console_wallet_version: String::new(),
+            minotari_cli_version: String::new(),
+            base_node_version: String::new(),
+            wallet_bin_path: String::new(),
+            minotari_bin_path: String::new(),
+            old_wallet_password: String::new(),
+            new_wallet_password: String::new(),
+            payment_processor_password: String::new(),
+            old_wallet_data_dir: String::new(),
+            new_wallet_data_dir: String::new(),
+            payment_processor_data_dir: String::new(),
+            grpc_port: 0,
+        }
+    }
+
+    #[tokio::test]
+    async fn s0_records_observed_funding_tx_metrics() {
+        let driver = FakeDriver::new().with_balances(VecDeque::from([10_000]));
+        let result = run_s0(&driver, &sample_config()).await.unwrap();
+
+        assert_eq!(result.scenario_name, "S0");
+        assert_eq!(result.success_count, 1);
+        assert_eq!(result.failure_count, 0);
+        assert_eq!(result.tx_metrics.len(), 1);
+        assert_eq!(result.tx_metrics[0].tx_id, "funding");
+        assert!(result.tx_metrics[0].broadcast_to_confirmed_secs > 0.0);
+    }
+
+    #[tokio::test]
+    async fn s1_uses_two_output_doubling_and_fanout_batches() {
+        let driver = FakeDriver::new().with_balances(VecDeque::from([10_000, 10_000]));
+        let result = run_s1(&driver, &sample_config()).await.unwrap();
+        let state = driver.state.lock().unwrap();
+
+        assert_eq!(result.scenario_name, "S1");
+        assert_eq!(state.single_calls, 0);
+        assert_eq!(state.batch_calls, vec![2, 2, 2, 3, 3, 3, 3]);
+        assert_eq!(result.success_count, 7);
+    }
+
+    #[tokio::test]
+    async fn s5_uses_m_over_k_batches_and_m_singles() {
+        let driver = FakeDriver::new().with_balances(VecDeque::from([10_000, 10_000]));
+        let result = run_s5(&driver, &sample_config()).await.unwrap();
+        let state = driver.state.lock().unwrap();
+
+        assert_eq!(result.scenario_name, "S5");
+        assert_eq!(state.batch_calls, vec![3, 3, 3, 3]);
+        assert_eq!(state.single_calls, 12);
+        assert_eq!(result.tx_metrics.len(), 16);
+    }
+
+    #[tokio::test]
+    async fn s2_fails_when_balance_does_not_match_expected_checkpoint() {
+        let driver = FakeDriver::new()
+            .with_balances(VecDeque::from([8_000]))
+            .with_scan_outputs(REDISCOVERY_TARGET);
+        let result = run_s2(&driver, 10_000).await.unwrap();
+
+        assert_eq!(result.success_count, 0);
+        assert_eq!(result.failure_count, 1);
+        assert_eq!(result.balance_delta, 2_000);
+    }
+
+    #[tokio::test]
+    async fn s0_surfaces_funding_observation_failure() {
+        let driver = FakeDriver::new()
+            .with_balances(VecDeque::from([0]))
+            .with_funding_result(Err(anyhow!("no funding observed")));
+        let result = run_s0(&driver, &sample_config()).await.unwrap();
+
+        assert_eq!(result.success_count, 0);
+        assert_eq!(result.failure_count, 1);
+        assert_eq!(result.tx_metrics.len(), 1);
+        assert_eq!(result.tx_metrics[0].tx_id, "incoming-funding");
+        assert_eq!(result.tx_metrics[0].error.as_deref(), Some("no funding observed"));
+    }
+}
+
