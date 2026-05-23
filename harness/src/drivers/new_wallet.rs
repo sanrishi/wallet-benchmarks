@@ -6,6 +6,7 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::{anyhow, Context};
 use reqwest::Client;
+use rusqlite::{Connection, OptionalExtension};
 use serde::Deserialize;
 use tari_common::configuration::Network;
 use tari_common_types::seeds::{
@@ -193,6 +194,91 @@ impl NewWalletDriver {
             (None, None) => Err(anyhow!("submit_transaction returned no result")),
         }
     }
+
+    fn get_unspent_output_count(&self) -> anyhow::Result<u64> {
+        let connection = Connection::open(self.database_path())
+            .context("failed to open new_wallet database for output counting")?;
+        let count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM outputs WHERE deleted_at IS NULL AND status = 'UNSPENT'",
+                [],
+                |row| row.get(0),
+            )
+            .context("failed to query unspent outputs from new_wallet database")?;
+        Ok(count.max(0) as u64)
+    }
+
+    fn get_scanned_tip_height(&self) -> anyhow::Result<u64> {
+        let connection = Connection::open(self.database_path())
+            .context("failed to open new_wallet database for tip height")?;
+        let height = connection
+            .query_row("SELECT MAX(height) FROM scanned_tip_blocks", [], |row| row.get::<_, Option<u64>>(0))
+            .optional()
+            .context("failed to query scanned_tip_blocks from new_wallet database")?
+            .flatten()
+            .unwrap_or(0);
+        Ok(height)
+    }
+
+    fn scan_from_height(&self, from_height: u64) -> anyhow::Result<ScanMetrics> {
+        self.ensure_wallet_initialized()?;
+
+        let database_path = self.database_path();
+        let database_path = database_path
+            .to_str()
+            .ok_or_else(|| anyhow!("database path is not valid UTF-8"))?;
+        let base_node_url = self.base_node_url.as_str();
+        let from_height_string = from_height.to_string();
+        let h_tip_start = self.get_tip_height_blocking()?;
+        let started_at = Instant::now();
+
+        self.run_cli_command(&[
+            "re-scan",
+            "--database-path",
+            database_path,
+            "--password",
+            &self.password,
+            "--base-url",
+            base_node_url,
+            "--account-name",
+            DEFAULT_ACCOUNT_NAME,
+            "--rescan-from-height",
+            &from_height_string,
+        ])?;
+
+        let wall_clock_secs = started_at.elapsed().as_secs_f64();
+        let h_tip_end = self.get_tip_height_blocking()?;
+        let scanned_tip_height = self.get_scanned_tip_height()?;
+        let outputs_found = self.get_unspent_output_count()?;
+        let scanned_blocks = scanned_tip_height.saturating_sub(from_height);
+        let blocks_per_sec = if wall_clock_secs > 0.0 {
+            scanned_blocks as f64 / wall_clock_secs
+        } else {
+            0.0
+        };
+
+        Ok(ScanMetrics {
+            wall_clock_secs,
+            blocks_per_sec,
+            h_tip_start,
+            h_tip_end,
+            outputs_found,
+            peak_rss_kb: 0,
+            peak_cpu_percent: 0.0,
+        })
+    }
+
+    fn get_tip_height_blocking(&self) -> anyhow::Result<u64> {
+        let url = format!("{}/get_tip_info", self.base_node_url.trim_end_matches('/'));
+        let response = reqwest::blocking::get(url)
+            .context("failed to query get_tip_info with blocking client")?
+            .error_for_status()
+            .context("base node returned an HTTP error on blocking get_tip_info")?;
+        let tip: TipInfoResponse = response
+            .json()
+            .context("failed to parse blocking get_tip_info response")?;
+        Ok(tip.metadata.best_block_height)
+    }
 }
 
 #[async_trait]
@@ -243,11 +329,11 @@ impl WalletDriver for NewWalletDriver {
     }
 
     async fn scan_from_genesis(&self) -> anyhow::Result<ScanMetrics> {
-        todo!("new_wallet scan_from_genesis: Phase 3 CLI scan wrapper")
+        self.scan_from_height(0)
     }
 
-    async fn scan_from_birthday(&self, _height: u64) -> anyhow::Result<ScanMetrics> {
-        todo!("new_wallet scan_from_birthday: Phase 3 CLI re-scan wrapper")
+    async fn scan_from_birthday(&self, height: u64) -> anyhow::Result<ScanMetrics> {
+        self.scan_from_height(height)
     }
 
     async fn send_single(
