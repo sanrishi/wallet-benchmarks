@@ -85,6 +85,7 @@ async fn print_all_wallet_addresses(config: &Config) -> anyhow::Result<()> {
         require_nonempty_path("old_wallet_data_dir", &config.old_wallet_data_dir)?,
         config.old_wallet_password.clone(),
         config.grpc_port,
+        config.c_min,
     );
     old_wallet.start().await?;
     let old_wallet_result = old_wallet.get_self_address().await;
@@ -95,6 +96,7 @@ async fn print_all_wallet_addresses(config: &Config) -> anyhow::Result<()> {
         require_nonempty_path("minotari_bin_path", &config.minotari_bin_path)?,
         require_nonempty_path("new_wallet_data_dir", &config.new_wallet_data_dir)?,
         config.base_node_http_url.clone(),
+        config.c_min,
         config.new_wallet_password.clone(),
     )?;
     println!("new_wallet: {}", new_wallet.get_self_address().await?);
@@ -106,6 +108,7 @@ async fn print_all_wallet_addresses(config: &Config) -> anyhow::Result<()> {
             &config.payment_processor_data_dir,
         )?,
         config.base_node_http_url.clone(),
+        config.c_min,
         config.payment_processor_password.clone(),
     )?;
     println!(
@@ -239,6 +242,7 @@ async fn main() -> anyhow::Result<()> {
         require_nonempty_path("old_wallet_data_dir", &config.old_wallet_data_dir)?,
         config.old_wallet_password.clone(),
         config.grpc_port,
+        config.c_min,
     );
     let old_wallet_scenarios = match run_old_wallet_scenarios(&mut old_wallet, &config).await {
         Ok(s) => s,
@@ -262,6 +266,7 @@ async fn main() -> anyhow::Result<()> {
         require_nonempty_path("minotari_bin_path", &config.minotari_bin_path)?,
         require_nonempty_path("new_wallet_data_dir", &config.new_wallet_data_dir)?,
         config.base_node_http_url.clone(),
+        config.c_min,
         config.new_wallet_password.clone(),
     );
     let (new_wallet_mode_name, new_wallet_scenarios) = match new_wallet {
@@ -299,6 +304,7 @@ async fn main() -> anyhow::Result<()> {
             &config.payment_processor_data_dir,
         )?,
         config.base_node_http_url.clone(),
+        config.c_min,
         config.payment_processor_password.clone(),
     );
     let (payment_processor_mode_name, payment_processor_scenarios) = match payment_processor {

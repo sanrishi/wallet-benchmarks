@@ -24,11 +24,18 @@ pub struct OldWalletDriver {
     pub password: String,
     pub grpc_url: String,         // e.g. "http://127.0.0.1:18143"
     pub grpc_port: u16,
+    pub confirmation_window: u64,
     process: Option<Child>,       // spawned wallet process
 }
 
 impl OldWalletDriver {
-    pub fn new(wallet_bin: PathBuf, data_dir: PathBuf, password: String, grpc_port: u16) -> Self {
+    pub fn new(
+        wallet_bin: PathBuf,
+        data_dir: PathBuf,
+        password: String,
+        grpc_port: u16,
+        confirmation_window: u64,
+    ) -> Self {
         let grpc_url = format!("http://127.0.0.1:{}", grpc_port);
         Self {
             wallet_bin,
@@ -36,6 +43,7 @@ impl OldWalletDriver {
             password,
             grpc_url,
             grpc_port,
+            confirmation_window,
             process: None,
         }
     }
@@ -213,6 +221,147 @@ impl OldWalletDriver {
             peak_cpu_percent,
         })
     }
+
+    async fn wait_for_confirmation(&self, tx_id: u64) -> anyhow::Result<f64> {
+        use tari_rpc::wallet_client::WalletClient;
+        use tari_rpc::GetTransactionInfoRequest;
+
+        let started_at = Instant::now();
+        let deadline = started_at + Duration::from_secs(600);
+        let required_confirmations = self.confirmation_window.max(1);
+        let confirmed_statuses = [
+            tari_rpc::TransactionStatus::MinedConfirmed as i32,
+            tari_rpc::TransactionStatus::MinedConfirmedLocked as i32,
+            tari_rpc::TransactionStatus::OneSidedConfirmed as i32,
+            tari_rpc::TransactionStatus::OneSidedConfirmedLocked as i32,
+            tari_rpc::TransactionStatus::CoinbaseConfirmed as i32,
+            tari_rpc::TransactionStatus::CoinbaseConfirmedLocked as i32,
+        ];
+
+        loop {
+            if Instant::now() > deadline {
+                return Err(anyhow!(
+                    "transaction {tx_id} was not confirmed within 600s"
+                ));
+            }
+
+            let mut client = WalletClient::connect(self.grpc_url.clone()).await?;
+            let response = client
+                .get_transaction_info(GetTransactionInfoRequest {
+                    transaction_ids: vec![tx_id],
+                })
+                .await?
+                .into_inner();
+
+            if let Some(info) = response.transactions.into_iter().next() {
+                if confirmed_statuses.contains(&info.status) {
+                    return Ok(started_at.elapsed().as_secs_f64());
+                }
+
+                if info.status == tari_rpc::TransactionStatus::Rejected as i32 {
+                    let reason = if info.rejected_reason.is_empty() {
+                        "transaction was rejected".to_string()
+                    } else {
+                        info.rejected_reason
+                    };
+                    return Err(anyhow!(reason));
+                }
+
+                if info.mined_in_block_height > 0 {
+                    let tip = self.get_tip_height().await?;
+                    let confirmation_height = info
+                        .mined_in_block_height
+                        .saturating_add(required_confirmations.saturating_sub(1));
+                    if tip >= confirmation_height {
+                        return Ok(started_at.elapsed().as_secs_f64());
+                    }
+                }
+            }
+
+            tokio::time::sleep(Duration::from_secs(2)).await;
+        }
+    }
+
+    fn payment_recipient(
+        address: &str,
+        amount_ut: u64,
+        fee_rate: u64,
+    ) -> tari_rpc::PaymentRecipient {
+        tari_rpc::PaymentRecipient {
+            address: address.to_string(),
+            amount: amount_ut,
+            fee_per_gram: fee_rate,
+            payment_type: tari_rpc::payment_recipient::PaymentType::StandardMimblewimble as i32,
+            raw_payment_id: Vec::new(),
+            user_payment_id: None,
+        }
+    }
+
+    async fn transfer_recipients(
+        &self,
+        recipients: Vec<(String, u64)>,
+        fee_rate: u64,
+    ) -> anyhow::Result<TxMetrics> {
+        use tari_rpc::wallet_client::WalletClient;
+        use tari_rpc::TransferRequest;
+
+        let started_at = Instant::now();
+        let mut client = WalletClient::connect(self.grpc_url.clone()).await?;
+        let construction_finished_at = Instant::now();
+        let response = client
+            .transfer(TransferRequest {
+                recipients: recipients
+                    .iter()
+                    .map(|(address, amount)| Self::payment_recipient(address, *amount, fee_rate))
+                    .collect(),
+                single_tx: true,
+            })
+            .await?
+            .into_inner();
+        let broadcast_finished_at = Instant::now();
+
+        let results = response.results;
+        let first = results
+            .first()
+            .cloned()
+            .ok_or_else(|| anyhow!("transfer returned no results"))?;
+        let failed_messages = results
+            .iter()
+            .filter(|result| !result.is_success)
+            .map(|result| {
+                if result.failure_message.is_empty() {
+                    format!("recipient {} failed", result.address)
+                } else {
+                    result.failure_message.clone()
+                }
+            })
+            .collect::<Vec<_>>();
+        let success = failed_messages.is_empty() && first.is_success;
+
+        if !success {
+            return Err(anyhow!(failed_messages.join("; ")));
+        }
+
+        let fee_paid = first
+            .transaction_info
+            .as_ref()
+            .map(|info| info.fee)
+            .unwrap_or(0);
+        let tx_id = first.transaction_id.to_string();
+        let broadcast_to_confirmed_secs = self.wait_for_confirmation(first.transaction_id).await?;
+
+        Ok(TxMetrics {
+            tx_id,
+            construction_secs: construction_finished_at.duration_since(started_at).as_secs_f64(),
+            broadcast_to_mempool_secs: broadcast_finished_at
+                .duration_since(construction_finished_at)
+                .as_secs_f64(),
+            broadcast_to_confirmed_secs,
+            fee_paid,
+            success: true,
+            error: None,
+        })
+    }
 }
 
 #[async_trait]
@@ -304,55 +453,15 @@ impl WalletDriver for OldWalletDriver {
         amount_ut: u64,
         fee_rate: u64,
     ) -> anyhow::Result<TxMetrics> {
-        use tari_rpc::wallet_client::WalletClient;
-        use tari_rpc::{PaymentRecipient, TransferRequest};
+        self.transfer_recipients(vec![(to_address.to_string(), amount_ut)], fee_rate)
+            .await
+    }
 
-        let started_at = Instant::now();
-        let mut client = WalletClient::connect(self.grpc_url.clone()).await?;
-        let construction_finished_at = Instant::now();
-        let resp = client
-            .transfer(TransferRequest {
-                recipients: vec![PaymentRecipient {
-                    address: to_address.to_string(),
-                    amount: amount_ut,
-                    fee_per_gram: fee_rate,
-                    payment_type: tari_rpc::payment_recipient::PaymentType::StandardMimblewimble
-                        as i32,
-                    raw_payment_id: Vec::new(),
-                    user_payment_id: None,
-                }],
-                single_tx: true,
-            })
-            .await?
-            .into_inner();
-        let broadcast_finished_at = Instant::now();
-
-        let result = resp
-            .results
-            .into_iter()
-            .next()
-            .ok_or_else(|| anyhow!("transfer returned no results"))?;
-        let fee_paid = result
-            .transaction_info
-            .as_ref()
-            .map(|info| info.fee)
-            .unwrap_or(0);
-        let error = if result.is_success {
-            None
-        } else {
-            Some(result.failure_message.clone())
-        };
-
-        Ok(TxMetrics {
-            tx_id: result.transaction_id.to_string(),
-            construction_secs: construction_finished_at.duration_since(started_at).as_secs_f64(),
-            broadcast_to_mempool_secs: broadcast_finished_at
-                .duration_since(construction_finished_at)
-                .as_secs_f64(),
-            broadcast_to_confirmed_secs: 0.0,
-            fee_paid,
-            success: result.is_success,
-            error,
-        })
+    async fn send_batch(
+        &self,
+        recipients: Vec<(String, u64)>,
+        fee_rate: u64,
+    ) -> anyhow::Result<TxMetrics> {
+        self.transfer_recipients(recipients, fee_rate).await
     }
 }

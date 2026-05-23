@@ -3,7 +3,7 @@ use std::fs;
 use std::io;
 use std::path::PathBuf;
 use std::str::FromStr;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, Context};
 use reqwest::Client;
@@ -36,6 +36,7 @@ pub struct NewWalletDriver {
     pub minotari_bin: PathBuf,
     pub data_dir: PathBuf,
     pub base_node_url: String,
+    confirmation_window: u64,
     http_client: Client,
     password: String,
     seed_words: String,
@@ -46,6 +47,7 @@ impl NewWalletDriver {
         minotari_bin: PathBuf,
         data_dir: PathBuf,
         base_node_url: String,
+        confirmation_window: u64,
         password: String,
     ) -> anyhow::Result<Self> {
         fs::create_dir_all(&data_dir)
@@ -56,6 +58,7 @@ impl NewWalletDriver {
             minotari_bin,
             data_dir,
             base_node_url,
+            confirmation_window,
             http_client: Client::new(),
             password,
             seed_words,
@@ -360,6 +363,197 @@ impl NewWalletDriver {
             peak_cpu_percent: 0.0,
         })
     }
+
+    fn tx_id_i64(tx_id: &str) -> anyhow::Result<i64> {
+        let tx_id = tx_id
+            .parse::<u64>()
+            .with_context(|| format!("failed to parse tx id '{tx_id}' as u64"))?;
+        Ok(tx_id as i64)
+    }
+
+    fn get_transaction_state(
+        &self,
+        tx_id: &str,
+    ) -> anyhow::Result<Option<(String, Option<u64>, Option<u64>, Option<String>)>> {
+        let connection = Connection::open(self.database_path())
+            .context("failed to open new_wallet database for transaction status")?;
+        let tx_id = Self::tx_id_i64(tx_id)?;
+        connection
+            .query_row(
+                "SELECT status, mined_height, confirmation_height, last_rejected_reason FROM completed_transactions WHERE id = ?1",
+                [tx_id],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, Option<u64>>(1)?,
+                        row.get::<_, Option<u64>>(2)?,
+                        row.get::<_, Option<String>>(3)?,
+                    ))
+                },
+            )
+            .optional()
+            .context("failed to query completed transaction state from new_wallet database")
+    }
+
+    async fn refresh_transaction_state(&self) -> anyhow::Result<()> {
+        self.ensure_wallet_initialized().await?;
+        let database_path = self.database_path();
+        let database_path = database_path
+            .to_str()
+            .ok_or_else(|| anyhow!("database path is not valid UTF-8"))?;
+
+        self.run_cli_command(&[
+            "scan",
+            "--database-path",
+            database_path,
+            "--password",
+            &self.password,
+            "--base-url",
+            self.base_node_url.as_str(),
+            "--account-name",
+            DEFAULT_ACCOUNT_NAME,
+            "--max-blocks-to-scan",
+            "1",
+        ])
+        .await?;
+
+        Ok(())
+    }
+
+    async fn wait_for_confirmation(&self, tx_id: &str) -> anyhow::Result<f64> {
+        let started_at = Instant::now();
+        let deadline = started_at + Duration::from_secs(600);
+
+        loop {
+            if Instant::now() > deadline {
+                return Err(anyhow!(
+                    "transaction {tx_id} was not confirmed within 600s"
+                ));
+            }
+
+            self.refresh_transaction_state().await?;
+            if let Some((status, mined_height, confirmation_height, rejected_reason)) =
+                self.get_transaction_state(tx_id)?
+            {
+                match status.as_str() {
+                    "mined_confirmed" => return Ok(started_at.elapsed().as_secs_f64()),
+                    "rejected" => {
+                        return Err(anyhow!(
+                            rejected_reason.unwrap_or_else(|| "transaction was rejected".to_string())
+                        ));
+                    }
+                    _ => {
+                        if let Some(target_height) = confirmation_height {
+                            let tip = self.get_tip_height().await?;
+                            if tip >= target_height {
+                                return Ok(started_at.elapsed().as_secs_f64());
+                            }
+                        } else if let Some(mined_height) = mined_height {
+                            let tip = self.get_tip_height().await?;
+                            let target_height = mined_height
+                                .saturating_add(self.confirmation_window.max(1).saturating_sub(1));
+                            if tip >= target_height {
+                                return Ok(started_at.elapsed().as_secs_f64());
+                            }
+                        }
+                    }
+                }
+            }
+
+            tokio::time::sleep(Duration::from_secs(2)).await;
+        }
+    }
+
+    async fn send_recipients(
+        &self,
+        recipients: Vec<(String, u64)>,
+    ) -> anyhow::Result<TxMetrics> {
+        self.ensure_wallet_initialized().await?;
+
+        let database_path = self.database_path();
+        let database_path = database_path
+            .to_str()
+            .ok_or_else(|| anyhow!("database path is not valid UTF-8"))?;
+        let output_file = NamedTempFile::new_in(&self.data_dir)
+            .context("failed to create temporary unsigned transaction file")?;
+        let output_file_str = output_file
+            .path()
+            .to_str()
+            .ok_or_else(|| anyhow!("unsigned transaction path is not valid UTF-8"))?;
+        let recipient_specs = recipients
+            .iter()
+            .map(|(address, amount)| format!("{address}::{amount}"))
+            .collect::<Vec<_>>();
+
+        let construction_started = Instant::now();
+        let mut args = vec![
+            "create-unsigned-transaction".to_string(),
+            "--database-path".to_string(),
+            database_path.to_string(),
+            "--password".to_string(),
+            self.password.clone(),
+            "--account-name".to_string(),
+            DEFAULT_ACCOUNT_NAME.to_string(),
+            "--confirmation-window".to_string(),
+            self.confirmation_window.max(1).to_string(),
+        ];
+        for recipient in &recipient_specs {
+            args.push("--recipient".to_string());
+            args.push(recipient.clone());
+        }
+        args.push("--output-file".to_string());
+        args.push(output_file_str.to_string());
+        let arg_refs = args.iter().map(String::as_str).collect::<Vec<_>>();
+        self.run_cli_command(&arg_refs).await?;
+
+        let unsigned_json = std::fs::read_to_string(output_file.path())
+            .with_context(|| format!("failed to read {}", output_file.path().display()))?;
+        let unsigned_tx = PrepareOneSidedTransactionForSigningResult::from_json(&unsigned_json)
+            .context("failed to parse unsigned transaction JSON")?;
+
+        let key_manager = self.key_manager()?;
+        let signed = sign_locked_transaction(
+            &key_manager,
+            ConsensusConstantsBuilder::new(Network::Esmeralda).build(),
+            Network::Esmeralda,
+            unsigned_tx,
+        )
+        .context("failed to offline-sign locked transaction")?;
+        let construction_secs = construction_started.elapsed().as_secs_f64();
+
+        let tx_id = signed.signed_transaction.tx_id.to_string();
+        let fee_paid = signed
+            .signed_transaction
+            .transaction
+            .body()
+            .kernels()
+            .iter()
+            .map(|kernel| kernel.fee.as_u64())
+            .sum();
+        let transaction_value = serde_json::to_value(&signed.signed_transaction.transaction)
+            .context("failed to serialize signed transaction for HTTP submit")?;
+
+        let broadcast_started = Instant::now();
+        let submit_result = self.submit_signed_transaction(&transaction_value).await;
+        let broadcast_to_mempool_secs = broadcast_started.elapsed().as_secs_f64();
+
+        match submit_result {
+            Ok(result) if result.accepted => Ok(TxMetrics {
+                tx_id: tx_id.clone(),
+                construction_secs,
+                broadcast_to_mempool_secs,
+                broadcast_to_confirmed_secs: self.wait_for_confirmation(&tx_id).await?,
+                fee_paid,
+                success: true,
+                error: None,
+            }),
+            Ok(result) => Err(anyhow!(
+                "transaction rejected by base node: {}",
+                result.rejection_reason
+            )),
+            Err(error) => Err(error),
+        }
+    }
 }
 
 #[async_trait]
@@ -427,83 +621,15 @@ impl WalletDriver for NewWalletDriver {
         amount_ut: u64,
         _fee_rate: u64,
     ) -> anyhow::Result<TxMetrics> {
-        self.ensure_wallet_initialized().await?;
+        self.send_recipients(vec![(to_address.to_string(), amount_ut)]).await
+    }
 
-        let database_path = self.database_path();
-        let database_path = database_path
-            .to_str()
-            .ok_or_else(|| anyhow!("database path is not valid UTF-8"))?;
-        let output_file = NamedTempFile::new_in(&self.data_dir)
-            .context("failed to create temporary unsigned transaction file")?;
-        let output_file_str = output_file
-            .path()
-            .to_str()
-            .ok_or_else(|| anyhow!("unsigned transaction path is not valid UTF-8"))?;
-        let recipient = format!("{to_address}::{amount_ut}");
-
-        let construction_started = Instant::now();
-        self.run_cli_command(&[
-            "create-unsigned-transaction",
-            "--database-path",
-            database_path,
-            "--password",
-            &self.password,
-            "--account-name",
-            DEFAULT_ACCOUNT_NAME,
-            "--recipient",
-            &recipient,
-            "--output-file",
-            output_file_str,
-        ])
-        .await?;
-
-        let unsigned_json = std::fs::read_to_string(output_file.path())
-            .with_context(|| format!("failed to read {}", output_file.path().display()))?;
-        let unsigned_tx = PrepareOneSidedTransactionForSigningResult::from_json(&unsigned_json)
-            .context("failed to parse unsigned transaction JSON")?;
-
-        let key_manager = self.key_manager()?;
-        let signed = sign_locked_transaction(
-            &key_manager,
-            ConsensusConstantsBuilder::new(Network::Esmeralda).build(),
-            Network::Esmeralda,
-            unsigned_tx,
-        )
-        .context("failed to offline-sign locked transaction")?;
-        let construction_secs = construction_started.elapsed().as_secs_f64();
-
-        let tx_id = signed.signed_transaction.tx_id.to_string();
-        let fee_paid = signed
-            .signed_transaction
-            .transaction
-            .body()
-            .kernels()
-            .iter()
-            .map(|kernel| kernel.fee.as_u64())
-            .sum();
-        let transaction_value = serde_json::to_value(&signed.signed_transaction.transaction)
-            .context("failed to serialize signed transaction for HTTP submit")?;
-
-        let broadcast_started = Instant::now();
-        let submit_result = self.submit_signed_transaction(&transaction_value).await;
-        let broadcast_to_mempool_secs = broadcast_started.elapsed().as_secs_f64();
-
-        match submit_result {
-            Ok(result) if result.accepted => Ok(TxMetrics {
-                tx_id,
-                construction_secs,
-                broadcast_to_mempool_secs,
-                broadcast_to_confirmed_secs: 0.0,
-                fee_paid,
-                success: true,
-                error: None,
-            }),
-            Ok(result) => Err(anyhow!(
-                "transaction rejected by base node: {}",
-                result.rejection_reason
-            )),
-            Err(error) => Err(error),
-        }
+    async fn send_batch(
+        &self,
+        recipients: Vec<(String, u64)>,
+        _fee_rate: u64,
+    ) -> anyhow::Result<TxMetrics> {
+        self.send_recipients(recipients).await
     }
 }
 

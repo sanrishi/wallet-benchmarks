@@ -69,17 +69,16 @@ pub async fn run_s1(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
 
     for round in 0..config.doubling_rounds {
         let round_tx_count = 1_u64 << round;
-        for tx_index in 0..round_tx_count {
-            let tx = attempt_send_single(
-                driver,
-                &self_address,
-                amount_per_tx,
-                fee_rate,
-            )
-            .await;
+        for _ in 0..round_tx_count {
+            let recipients = vec![
+                (self_address.clone(), amount_per_tx),
+                (self_address.clone(), amount_per_tx),
+            ];
+            let tx = attempt_send_batch(driver, recipients.clone(), fee_rate).await;
             if tx.success {
+                let transferred: u64 = recipients.iter().map(|(_, amount)| *amount).sum();
                 expected_balance = expected_balance
-                    .saturating_sub(amount_per_tx.saturating_add(tx.fee_paid));
+                    .saturating_sub(transferred.saturating_add(tx.fee_paid));
             }
             let failed = !tx.success;
             tx_metrics.push(tx);
@@ -97,18 +96,16 @@ pub async fn run_s1(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
         }
     }
 
-    let fanout_tx_count = 1_u64 << config.doubling_rounds.saturating_sub(0);
-    for index in 0..fanout_tx_count {
-        let tx = attempt_send_single(
-            driver,
-            &self_address,
-            amount_per_tx,
-            fee_rate,
-        )
-        .await;
+    let fanout_tx_count = 1_u64 << config.doubling_rounds;
+    for _ in 0..fanout_tx_count {
+        let recipients = (0..config.fanout_outputs_per_tx)
+            .map(|_| (self_address.clone(), amount_per_tx))
+            .collect::<Vec<_>>();
+        let tx = attempt_send_batch(driver, recipients.clone(), fee_rate).await;
         if tx.success {
+            let transferred: u64 = recipients.iter().map(|(_, amount)| *amount).sum();
             expected_balance =
-                expected_balance.saturating_sub(amount_per_tx.saturating_add(tx.fee_paid));
+                expected_balance.saturating_sub(transferred.saturating_add(tx.fee_paid));
         }
         let failed = !tx.success;
         tx_metrics.push(tx);
@@ -253,7 +250,7 @@ pub async fn run_s5(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
     let self_address = driver.get_self_address().await?;
 
     let num_batch_txs = config.s5_m / config.s5_k.max(1);
-    for batch_index in 0..num_batch_txs {
+    for _ in 0..num_batch_txs {
         let recipients = (0..config.s5_k)
             .map(|_| (self_address.clone(), 1_u64))
             .collect::<Vec<_>>();
@@ -265,7 +262,7 @@ pub async fn run_s5(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
         tx_metrics.push(tx);
     }
 
-    for index in 0..config.s5_m {
+    for _ in 0..config.s5_m {
         let tx = attempt_send_single(
             driver,
             &self_address,
