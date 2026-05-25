@@ -11,6 +11,7 @@ pub struct Config {
     pub s4_t_budget_secs: u64,
     pub s5_m: u64,
     pub s5_k: u64,
+    pub tx_amount_ut: u64,
     pub fee_rate: String,
     pub base_node_grpc_url: String,
     pub base_node_http_url: String,

@@ -25,6 +25,16 @@ The implementation intentionally does **not** add harness-side retry, backoff,
 artificial throttling, or UTXO pre-partitioning. Where a wallet stalls, rejects,
 or serializes internally, that behavior is surfaced as a benchmark result.
 
+For the current canonical-run budget, funding size and send size are
+intentionally decoupled:
+
+- `a_fund` is the wallet funding baseline
+- `tx_amount_ut` is the per-send amount used in `S1`, `S4`, and `S5`
+
+This keeps the benchmark aligned to the maintainer instruction to use low-value
+transactions that stay above fees, without accidentally scaling send size up
+with wallet budget.
+
 ## Acceptance Matrix
 
 | Issue Requirement | Branch Status | Notes |

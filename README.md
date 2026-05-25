@@ -48,6 +48,7 @@ Edit `config.toml` before running:
 - `old_wallet_password`: password passed to `minotari_console_wallet`
 - `new_wallet_password`: password used for Mode 2 wallet storage
 - `payment_processor_password`: password used for Mode 3 wallet storage
+- `tx_amount_ut`: per-transaction send amount used by `S1`, `S4`, and `S5`
 - `fee_rate`: optional explicit fee rate in `uT/g`; leave empty to use current
   driver defaults
 - `a_fund`: funding amount per mode
@@ -95,9 +96,14 @@ Use the same recipient set that you printed in Step 2.
 
 Current funding expectation:
 
-- `old_wallet`: one UTXO of `a_fund`
-- `new_wallet`: one UTXO of `a_fund`
-- `payment_processor`: one UTXO of `a_fund`
+- `old_wallet`: one UTXO of `a_fund` (current canonical config: `300T`)
+- `new_wallet`: one UTXO of `a_fund` (current canonical config: `300T`)
+- `payment_processor`: one UTXO of `a_fund` (current canonical config: `300T`)
+
+Current canonical run tuning:
+
+- `tx_amount_ut = 200`
+- `a_fund = 300000000` (`300T`)
 
 The funding step is external to the measurement. Wait until the funding
 transactions are visible on the network before starting the timed benchmark run.

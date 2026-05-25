@@ -66,7 +66,7 @@ pub async fn run_s1(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
     let mut expected_balance = initial_balance;
     let mut tx_metrics = Vec::new();
     let fee_rate = parse_fee_rate(config);
-    let amount_per_tx = (config.a_fund / config.volume_target.max(1)).max(1);
+    let amount_per_tx = config.tx_amount_ut.max(1);
     let self_address = driver.get_self_address().await?;
 
     for round in 0..config.doubling_rounds {
@@ -194,7 +194,7 @@ pub async fn run_s4(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
                 async move {
                     match tokio::time::timeout(
                         per_tx_timeout,
-                        driver.send_single(&address, 1, fee_rate),
+                        driver.send_single(&address, config.tx_amount_ut.max(1), fee_rate),
                     )
                     .await
                     {
@@ -228,8 +228,8 @@ pub async fn run_s4(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
         let batch_results = join_all(futures).await;
         for tx in batch_results {
             if tx.success {
-                expected_balance =
-                    expected_balance.saturating_sub(1_u64.saturating_add(tx.fee_paid));
+                expected_balance = expected_balance
+                    .saturating_sub(config.tx_amount_ut.max(1).saturating_add(tx.fee_paid));
             }
             tx_metrics.push(tx);
         }
@@ -257,7 +257,7 @@ pub async fn run_s5(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
     let num_batch_txs = config.s5_m / config.s5_k.max(1);
     for _ in 0..num_batch_txs {
         let recipients = (0..config.s5_k)
-            .map(|_| (self_address.clone(), 1_u64))
+            .map(|_| (self_address.clone(), config.tx_amount_ut.max(1)))
             .collect::<Vec<_>>();
         let tx = attempt_send_batch(driver, recipients.clone(), fee_rate).await;
         if tx.success {
@@ -271,12 +271,13 @@ pub async fn run_s5(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
         let tx = attempt_send_single(
             driver,
             &self_address,
-            1,
+            config.tx_amount_ut.max(1),
             fee_rate,
         )
         .await;
         if tx.success {
-            expected_balance = expected_balance.saturating_sub(1_u64.saturating_add(tx.fee_paid));
+            expected_balance = expected_balance
+                .saturating_sub(config.tx_amount_ut.max(1).saturating_add(tx.fee_paid));
         }
         tx_metrics.push(tx);
     }
@@ -608,6 +609,7 @@ mod tests {
             s4_t_budget_secs: 60,
             s5_m: 12,
             s5_k: 3,
+            tx_amount_ut: 200,
             fee_rate: "1".to_string(),
             base_node_grpc_url: String::new(),
             base_node_http_url: String::new(),
