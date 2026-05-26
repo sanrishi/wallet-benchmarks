@@ -1,13 +1,15 @@
 use async_trait::async_trait;
 use std::fs;
 use std::io;
+use std::net::TcpListener;
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::process::Stdio;
 use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, Context};
 use reqwest::Client;
-use rusqlite::{Connection, OptionalExtension};
+use rusqlite::Connection;
 use serde::Deserialize;
 use tari_common::configuration::Network;
 use tari_common_types::seeds::{
@@ -78,7 +80,14 @@ impl NewWalletDriver {
         let database_path = data_dir.join("wallet.db");
 
         match fs::read_to_string(&seed_words_path) {
-            Ok(seed_words) => return Ok(seed_words.trim().to_string()),
+            Ok(seed_words) => {
+                let normalized = Self::normalize_seed_words(seed_words.trim())?;
+                if normalized != seed_words.trim() {
+                    fs::write(&seed_words_path, &normalized)
+                        .with_context(|| format!("failed to rewrite {}", seed_words_path.display()))?;
+                }
+                return Ok(normalized);
+            }
             Err(error) if error.kind() == io::ErrorKind::NotFound => {}
             Err(error) => {
                 return Err(error).with_context(|| {
@@ -95,7 +104,9 @@ impl NewWalletDriver {
             ));
         }
 
-        let seed_words = CipherSeed::random()
+        let mut seed = CipherSeed::random();
+        seed.change_birthday(0);
+        let seed_words = seed
             .to_mnemonic(MnemonicLanguage::English, None)
             .context("failed to generate mnemonic seed words for new_wallet")?
             .join(" ")
@@ -104,6 +115,21 @@ impl NewWalletDriver {
         fs::write(&seed_words_path, &seed_words)
             .with_context(|| format!("failed to write {}", seed_words_path.display()))?;
         Ok(seed_words)
+    }
+
+    fn normalize_seed_words(seed_words: &str) -> anyhow::Result<String> {
+        let mnemonic = SeedWords::from_str(seed_words)
+            .context("failed to parse stored seed words for new_wallet")?;
+        let mut seed = CipherSeed::from_mnemonic(&mnemonic, None)
+            .context("failed to reconstruct cipher seed for new_wallet")?;
+        if seed.birthday() != 0 {
+            seed.change_birthday(0);
+        }
+        Ok(seed
+            .to_mnemonic(MnemonicLanguage::English, None)?
+            .join(" ")
+            .reveal()
+            .to_string())
     }
 
     async fn run_cli_command(&self, args: &[&str]) -> anyhow::Result<String> {
@@ -302,18 +328,122 @@ impl NewWalletDriver {
         Ok(count.max(0) as u64)
     }
 
-    fn get_scanned_tip_height(&self) -> anyhow::Result<u64> {
-        let connection = Connection::open(self.database_path())
-            .context("failed to open new_wallet database for tip height")?;
-        let height = connection
-            .query_row("SELECT MAX(height) FROM scanned_tip_blocks", [], |row| {
-                row.get::<_, Option<u64>>(0)
-            })
-            .optional()
-            .context("failed to query scanned_tip_blocks from new_wallet database")?
-            .flatten()
-            .unwrap_or(0);
-        Ok(height)
+    fn find_free_api_port() -> anyhow::Result<u16> {
+        let listener = TcpListener::bind(("127.0.0.1", 0))
+            .context("failed to bind an ephemeral port for minotari daemon")?;
+        let port = listener
+            .local_addr()
+            .context("failed to read ephemeral port for minotari daemon")?
+            .port();
+        drop(listener);
+        Ok(port)
+    }
+
+    async fn spawn_daemon(&self, scan_interval_secs: Option<u64>) -> anyhow::Result<WalletDaemon> {
+        self.ensure_wallet_initialized().await?;
+        let port = Self::find_free_api_port()?;
+        let database_path = self.database_path();
+        let database_path = database_path
+            .to_str()
+            .ok_or_else(|| anyhow!("database path is not valid UTF-8"))?;
+        let mut args = vec![
+            "daemon".to_string(),
+            "--password".to_string(),
+            self.password.clone(),
+            "--database-path".to_string(),
+            database_path.to_string(),
+            "--api-port".to_string(),
+            port.to_string(),
+            "--base-url".to_string(),
+            self.base_node_url.clone(),
+        ];
+        if let Some(interval) = scan_interval_secs {
+            args.push("--scan-interval-secs".to_string());
+            args.push(interval.to_string());
+        }
+        let child = Command::new(&self.minotari_bin)
+            .args(&args)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .with_context(|| format!("failed to spawn minotari daemon at {}", self.minotari_bin.display()))?;
+        let daemon = WalletDaemon {
+            child,
+            base_url: format!("http://127.0.0.1:{port}"),
+        };
+        let deadline = Instant::now() + Duration::from_secs(30);
+        loop {
+            if Instant::now() > deadline {
+                let _ = daemon.stop().await;
+                return Err(anyhow!("minotari daemon API did not become ready within 30s"));
+            }
+            if self
+                .http_client
+                .get(format!("{}/version", daemon.base_url))
+                .send()
+                .await
+                .and_then(|response| response.error_for_status())
+                .is_ok()
+            {
+                return Ok(daemon);
+            }
+            tokio::time::sleep(Duration::from_millis(250)).await;
+        }
+    }
+
+    async fn get_scan_status(&self, daemon: &WalletDaemon) -> anyhow::Result<ScanStatusResponse> {
+        self.http_client
+            .get(format!(
+                "{}/accounts/{}/scan_status",
+                daemon.base_url, DEFAULT_ACCOUNT_NAME
+            ))
+            .send()
+            .await
+            .context("failed to query minotari scan_status API")?
+            .error_for_status()
+            .context("minotari scan_status API returned an HTTP error")?
+            .json()
+            .await
+            .context("failed to parse minotari scan_status response")
+    }
+
+    async fn get_completed_transaction(
+        &self,
+        daemon: &WalletDaemon,
+        tx_id: &str,
+    ) -> anyhow::Result<Option<CompletedTransactionResponse>> {
+        let transactions: Vec<CompletedTransactionResponse> = self
+            .http_client
+            .get(format!(
+                "{}/accounts/{}/completed_transactions?limit=1000&offset=0",
+                daemon.base_url, DEFAULT_ACCOUNT_NAME
+            ))
+            .send()
+            .await
+            .context("failed to query minotari completed_transactions API")?
+            .error_for_status()
+            .context("minotari completed_transactions API returned an HTTP error")?
+            .json()
+            .await
+            .context("failed to parse minotari completed_transactions response")?;
+        Ok(transactions
+            .into_iter()
+            .find(|transaction| Self::tx_id_matches(&transaction.id, tx_id)))
+    }
+
+    fn tx_id_matches(value: &serde_json::Value, expected: &str) -> bool {
+        if let Some(id) = value.as_u64() {
+            return expected.parse::<u64>().ok() == Some(id);
+        }
+        if let Some(id) = value.as_str() {
+            return id == expected;
+        }
+        value.as_object()
+            .and_then(|object| object.values().next())
+            .and_then(|value| value.as_u64())
+            .zip(expected.parse::<u64>().ok())
+            .map(|(actual, expected)| actual == expected)
+            .unwrap_or(false)
     }
 
     async fn scan_from_height(&self, from_height: u64) -> anyhow::Result<ScanMetrics> {
@@ -344,7 +474,10 @@ impl NewWalletDriver {
 
         let wall_clock_secs = started_at.elapsed().as_secs_f64();
         let h_tip_end = self.get_tip_height().await?;
-        let scanned_tip_height = self.get_scanned_tip_height()?;
+        let daemon = self.spawn_daemon(None).await?;
+        let scan_status = self.get_scan_status(&daemon).await?;
+        let _ = daemon.stop().await;
+        let scanned_tip_height = scan_status.last_scanned_height;
         let outputs_found = self.get_unspent_output_count()?;
         let scanned_blocks = scanned_tip_height.saturating_sub(from_height);
         let blocks_per_sec = if wall_clock_secs > 0.0 {
@@ -364,83 +497,36 @@ impl NewWalletDriver {
         })
     }
 
-    fn tx_id_i64(tx_id: &str) -> anyhow::Result<i64> {
-        let tx_id = tx_id
-            .parse::<u64>()
-            .with_context(|| format!("failed to parse tx id '{tx_id}' as u64"))?;
-        Ok(tx_id as i64)
-    }
-
-    fn get_transaction_state(
-        &self,
-        tx_id: &str,
-    ) -> anyhow::Result<Option<(String, Option<String>)>> {
-        let connection = Connection::open(self.database_path())
-            .context("failed to open new_wallet database for transaction status")?;
-        let tx_id = Self::tx_id_i64(tx_id)?;
-        connection
-            .query_row(
-                "SELECT status, last_rejected_reason FROM completed_transactions WHERE id = ?1",
-                [tx_id],
-                |row| {
-                    Ok((
-                        row.get::<_, String>(0)?,
-                        row.get::<_, Option<String>>(1)?,
-                    ))
-                },
-            )
-            .optional()
-            .context("failed to query completed transaction state from new_wallet database")
-    }
-
-    async fn refresh_transaction_state(&self) -> anyhow::Result<()> {
-        self.ensure_wallet_initialized().await?;
-        let database_path = self.database_path();
-        let database_path = database_path
-            .to_str()
-            .ok_or_else(|| anyhow!("database path is not valid UTF-8"))?;
-
-        self.run_cli_command(&[
-            "scan",
-            "--database-path",
-            database_path,
-            "--password",
-            &self.password,
-            "--base-url",
-            self.base_node_url.as_str(),
-            "--account-name",
-            DEFAULT_ACCOUNT_NAME,
-            "--max-blocks-to-scan",
-            "1",
-        ])
-        .await?;
-
-        Ok(())
-    }
-
     async fn wait_for_confirmation(&self, tx_id: &str) -> anyhow::Result<f64> {
         let started_at = Instant::now();
         let deadline = started_at + Duration::from_secs(600);
+        let daemon = self.spawn_daemon(Some(1)).await?;
 
         loop {
             if Instant::now() > deadline {
+                let _ = daemon.stop().await;
                 return Err(anyhow!(
                     "transaction {tx_id} was not confirmed within 600s"
                 ));
             }
 
-            self.refresh_transaction_state().await?;
-            if let Some((status, rejected_reason)) =
-                self.get_transaction_state(tx_id)?
-            {
-                match status.as_str() {
-                    "mined_confirmed" => return Ok(started_at.elapsed().as_secs_f64()),
+            if let Some(transaction) = self.get_completed_transaction(&daemon, tx_id).await? {
+                match transaction.status.as_str() {
+                    "mined_confirmed" => {
+                        let elapsed = started_at.elapsed().as_secs_f64();
+                        let _ = daemon.stop().await;
+                        return Ok(elapsed);
+                    }
                     "canceled" => {
+                        let _ = daemon.stop().await;
                         return Err(anyhow!("transaction was canceled"));
                     }
                     "rejected" => {
+                        let _ = daemon.stop().await;
                         return Err(anyhow!(
-                            rejected_reason.unwrap_or_else(|| "transaction was rejected".to_string())
+                            transaction
+                                .last_rejected_reason
+                                .unwrap_or_else(|| "transaction was rejected".to_string())
                         ));
                     }
                     _ => {}
@@ -622,18 +708,20 @@ impl WalletDriver for NewWalletDriver {
     async fn observe_funding(&self, expected_amount_ut: u64) -> anyhow::Result<TxMetrics> {
         let started_at = Instant::now();
         let deadline = started_at + Duration::from_secs(600);
+        let daemon = self.spawn_daemon(Some(1)).await?;
 
         loop {
             if Instant::now() > deadline {
+                let _ = daemon.stop().await;
                 return Err(anyhow!(
                     "incoming funding of at least {expected_amount_ut} uT was not observed within 600s"
                 ));
             }
 
-            self.refresh_transaction_state().await?;
             let available = self.get_balance().await?;
             if available >= expected_amount_ut {
                 let elapsed = started_at.elapsed().as_secs_f64();
+                let _ = daemon.stop().await;
                 return Ok(TxMetrics {
                     tx_id: "incoming-funding".to_string(),
                     construction_secs: 0.0,
@@ -658,6 +746,31 @@ struct TipInfoResponse {
 #[derive(Debug, Deserialize)]
 struct TipMetadata {
     best_block_height: u64,
+}
+
+struct WalletDaemon {
+    child: tokio::process::Child,
+    base_url: String,
+}
+
+impl WalletDaemon {
+    async fn stop(mut self) -> anyhow::Result<()> {
+        let _ = self.child.kill().await;
+        let _ = self.child.wait().await;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct ScanStatusResponse {
+    last_scanned_height: u64,
+}
+
+#[derive(Debug, Deserialize)]
+struct CompletedTransactionResponse {
+    id: serde_json::Value,
+    status: String,
+    last_rejected_reason: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

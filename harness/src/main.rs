@@ -70,11 +70,6 @@ async fn restart_old_wallet_for_scan(old_wallet: &mut OldWalletDriver) -> anyhow
 }
 
 async fn print_old_wallet_address(old_wallet: &OldWalletDriver) {
-    if let Some(line) = old_wallet.find_wallet_address_in_logs() {
-        println!("B0 old_wallet log address line: {line}");
-        return;
-    }
-
     match old_wallet.get_wallet_address().await {
         Ok(address) => println!("B0 old_wallet address: {address}"),
         Err(error) => eprintln!("B0 old_wallet address unavailable: {error}"),
@@ -87,8 +82,9 @@ async fn print_all_wallet_addresses(config: &Config) -> anyhow::Result<()> {
         require_nonempty_path("old_wallet_data_dir", &config.old_wallet_data_dir)?,
         config.old_wallet_password.clone(),
         config.grpc_port,
+        config.base_node_http_url.clone(),
         config.c_min,
-    );
+    )?;
     old_wallet.start().await?;
     let old_wallet_result = old_wallet.get_self_address().await;
     old_wallet.stop();
@@ -244,8 +240,9 @@ async fn main() -> anyhow::Result<()> {
         require_nonempty_path("old_wallet_data_dir", &config.old_wallet_data_dir)?,
         config.old_wallet_password.clone(),
         config.grpc_port,
+        config.base_node_http_url.clone(),
         config.c_min,
-    );
+    )?;
     let old_wallet_scenarios = match run_old_wallet_scenarios(&mut old_wallet, &config).await {
         Ok(s) => s,
         Err(e) => {

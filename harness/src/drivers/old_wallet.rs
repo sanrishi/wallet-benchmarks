@@ -1,14 +1,18 @@
 use std::fs;
-use std::fs::File;
 use std::io::ErrorKind;
-use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::process::{Child, Command};
+use std::str::FromStr;
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 use anyhow::anyhow;
+use reqwest::Client;
 use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
+use tari_common_types::seeds::{
+    cipher_seed::CipherSeed,
+    mnemonic::{Mnemonic, MnemonicLanguage},
+};
 
 use crate::driver::WalletDriver;
 use crate::metrics::{ScanMetrics, TxMetrics};
@@ -24,7 +28,10 @@ pub struct OldWalletDriver {
     pub password: String,
     pub grpc_url: String,         // e.g. "http://127.0.0.1:18143"
     pub grpc_port: u16,
+    pub base_node_url: String,
     pub confirmation_window: u64,
+    http_client: Client,
+    seed_words: String,
     process: Option<Child>,       // spawned wallet process
 }
 
@@ -34,18 +41,66 @@ impl OldWalletDriver {
         data_dir: PathBuf,
         password: String,
         grpc_port: u16,
+        base_node_url: String,
         confirmation_window: u64,
-    ) -> Self {
+    ) -> anyhow::Result<Self> {
         let grpc_url = format!("http://127.0.0.1:{}", grpc_port);
-        Self {
+        fs::create_dir_all(&data_dir)?;
+        let seed_words = Self::load_or_create_seed_words(&data_dir)?;
+        Ok(Self {
             wallet_bin,
             data_dir,
             password,
             grpc_url,
             grpc_port,
+            base_node_url,
             confirmation_window,
+            http_client: Client::new(),
+            seed_words,
             process: None,
+        })
+    }
+
+    fn seed_words_path(data_dir: &std::path::Path) -> PathBuf {
+        data_dir.join("seed_words.txt")
+    }
+
+    fn load_or_create_seed_words(data_dir: &std::path::Path) -> anyhow::Result<String> {
+        let seed_words_path = Self::seed_words_path(data_dir);
+        match fs::read_to_string(&seed_words_path) {
+            Ok(seed_words) => {
+                let normalized = Self::normalize_seed_birthday(seed_words.trim())?;
+                if normalized != seed_words.trim() {
+                    fs::write(&seed_words_path, &normalized)?;
+                }
+                Ok(normalized)
+            }
+            Err(error) if error.kind() == ErrorKind::NotFound => {
+                let mut seed = CipherSeed::random();
+                seed.change_birthday(0);
+                let seed_words = seed
+                    .to_mnemonic(MnemonicLanguage::English, None)?
+                    .join(" ")
+                    .reveal()
+                    .to_string();
+                fs::write(&seed_words_path, &seed_words)?;
+                Ok(seed_words)
+            }
+            Err(error) => Err(error.into()),
         }
+    }
+
+    fn normalize_seed_birthday(seed_words: &str) -> anyhow::Result<String> {
+        let mnemonic = tari_common_types::seeds::seed_words::SeedWords::from_str(seed_words)?;
+        let mut seed = CipherSeed::from_mnemonic(&mnemonic, None)?;
+        if seed.birthday() != 0 {
+            seed.change_birthday(0);
+        }
+        Ok(seed
+            .to_mnemonic(MnemonicLanguage::English, None)?
+            .join(" ")
+            .reveal()
+            .to_string())
     }
 
     /// Spawn the wallet process and block until gRPC port responds or timeout
@@ -56,6 +111,8 @@ impl OldWalletDriver {
             .arg(format!("/ip4/127.0.0.1/tcp/{}", self.grpc_port))
             .arg("--password")
             .arg(&self.password)
+            .arg("--seed-words")
+            .arg(&self.seed_words)
             .arg(format!("--base-path={}", self.data_dir.display()))
             .arg("--non-interactive-mode")
             .spawn()?;
@@ -87,37 +144,6 @@ impl OldWalletDriver {
         self.process = None;
     }
 
-    pub fn find_wallet_address_in_logs(&self) -> Option<String> {
-        let log_dir = self
-            .data_dir
-            .join("esmeralda")
-            .join("log")
-            .join("wallet");
-        let candidates = ["stdout.log", "other.log", "base_layer.log"];
-
-        for file_name in candidates {
-            let path = log_dir.join(file_name);
-            let Ok(file) = File::open(path) else {
-                continue;
-            };
-            let reader = BufReader::new(file);
-            let mut last_match = None;
-            for line in reader.lines() {
-                let Ok(line) = line else {
-                    continue;
-                };
-                if line.contains("address") || line.contains("Address") {
-                    last_match = Some(line);
-                }
-            }
-            if last_match.is_some() {
-                return last_match;
-            }
-        }
-
-        None
-    }
-
     pub async fn get_wallet_address(&self) -> anyhow::Result<String> {
         use tari_rpc::wallet_client::WalletClient;
 
@@ -145,11 +171,34 @@ impl OldWalletDriver {
         Ok(resp.amount.len() as u64)
     }
 
+    async fn get_scanned_height(&self) -> anyhow::Result<u64> {
+        use tari_rpc::GetStateRequest;
+        use tari_rpc::wallet_client::WalletClient;
+
+        let mut client = WalletClient::connect(self.grpc_url.clone()).await?;
+        let resp = client.get_state(GetStateRequest {}).await?.into_inner();
+        Ok(resp.scanned_height)
+    }
+
+    async fn get_base_node_tip_height(&self) -> anyhow::Result<u64> {
+        let url = format!("{}/get_tip_info", self.base_node_url.trim_end_matches('/'));
+        let tip: TipInfoResponse = self
+            .http_client
+            .get(url)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
+        Ok(tip.metadata.best_block_height)
+    }
+
     async fn scan_from_height(&self, from_height: u64) -> anyhow::Result<ScanMetrics> {
         use tari_rpc::wallet_client::WalletClient;
         use tari_rpc::RescanWalletRequest;
 
-        let h_tip_start = self.get_tip_height().await?;
+        let h_tip_start = self.get_base_node_tip_height().await?;
+        let target_tip = h_tip_start;
         let pid = self
             .process
             .as_ref()
@@ -167,12 +216,12 @@ impl OldWalletDriver {
         let mut peak_rss_kb = 0_u64;
         let mut peak_cpu_percent = 0.0_f64;
         let mut h_tip_end = h_tip_start;
-        let mut last_height = None;
-        let mut stable_polls = 0_u8;
 
         loop {
             if Instant::now() > deadline {
-                return Err(anyhow!("wallet scan did not stabilize within 1800s"));
+                return Err(anyhow!(
+                    "wallet scan did not reach target tip {target_tip} within 1800s"
+                ));
             }
 
             system.refresh_processes_specifics(
@@ -185,17 +234,9 @@ impl OldWalletDriver {
                 peak_cpu_percent = peak_cpu_percent.max(process.cpu_usage() as f64);
             }
 
-            let height = self.get_tip_height().await?;
-            h_tip_end = height;
-
-            if last_height == Some(height) {
-                stable_polls = stable_polls.saturating_add(1);
-            } else {
-                stable_polls = 0;
-                last_height = Some(height);
-            }
-
-            if stable_polls >= 3 {
+            let scanned_height = self.get_scanned_height().await?;
+            h_tip_end = self.get_base_node_tip_height().await?;
+            if scanned_height >= target_tip {
                 break;
             }
 
@@ -203,7 +244,7 @@ impl OldWalletDriver {
         }
 
         let wall_clock_secs = started_at.elapsed().as_secs_f64();
-        let scanned_blocks = h_tip_end.saturating_sub(from_height);
+        let scanned_blocks = target_tip.saturating_sub(from_height);
         let outputs_found = self.get_unspent_output_count().await?;
         let blocks_per_sec = if wall_clock_secs > 0.0 {
             scanned_blocks as f64 / wall_clock_secs
@@ -301,6 +342,7 @@ impl OldWalletDriver {
         &self,
         recipients: Vec<(String, u64)>,
         fee_rate: u64,
+        single_tx: bool,
     ) -> anyhow::Result<TxMetrics> {
         use tari_rpc::wallet_client::WalletClient;
         use tari_rpc::TransferRequest;
@@ -314,7 +356,7 @@ impl OldWalletDriver {
                     .iter()
                     .map(|(address, amount)| Self::payment_recipient(address, *amount, fee_rate))
                     .collect(),
-                single_tx: true,
+                single_tx,
             })
             .await?
             .into_inner();
@@ -389,6 +431,16 @@ impl OldWalletDriver {
     }
 }
 
+#[derive(Debug, serde::Deserialize)]
+struct TipInfoResponse {
+    metadata: TipMetadata,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct TipMetadata {
+    best_block_height: u64,
+}
+
 #[async_trait]
 impl WalletDriver for OldWalletDriver {
     fn mode_name(&self) -> &str { "old_wallet" }
@@ -452,12 +504,7 @@ impl WalletDriver for OldWalletDriver {
     }
 
     async fn get_tip_height(&self) -> anyhow::Result<u64> {
-        use tari_rpc::GetStateRequest;
-        use tari_rpc::wallet_client::WalletClient;
-
-        let mut client = WalletClient::connect(self.grpc_url.clone()).await?;
-        let resp = client.get_state(GetStateRequest {}).await?.into_inner();
-        Ok(resp.scanned_height)
+        self.get_base_node_tip_height().await
     }
 
     async fn get_self_address(&self) -> anyhow::Result<String> {
@@ -478,7 +525,7 @@ impl WalletDriver for OldWalletDriver {
         amount_ut: u64,
         fee_rate: u64,
     ) -> anyhow::Result<TxMetrics> {
-        self.transfer_recipients(vec![(to_address.to_string(), amount_ut)], fee_rate)
+        self.transfer_recipients(vec![(to_address.to_string(), amount_ut)], fee_rate, true)
             .await
     }
 
@@ -487,7 +534,7 @@ impl WalletDriver for OldWalletDriver {
         recipients: Vec<(String, u64)>,
         fee_rate: u64,
     ) -> anyhow::Result<TxMetrics> {
-        self.transfer_recipients(recipients, fee_rate).await
+        self.transfer_recipients(recipients, fee_rate, false).await
     }
 
     async fn observe_funding(&self, expected_amount_ut: u64) -> anyhow::Result<TxMetrics> {
