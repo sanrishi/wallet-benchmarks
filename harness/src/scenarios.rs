@@ -25,6 +25,7 @@ pub async fn run_b0(driver: &dyn WalletDriver) -> anyhow::Result<ScenarioResult>
         balance_delta: 0_i64.saturating_sub(observed_balance as i64),
         tx_metrics: Vec::new(),
         scan_metrics: Some(scan_metrics),
+        recorded_birth_height: None,
     })
 }
 
@@ -57,6 +58,7 @@ pub async fn run_s0(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
         balance_delta: config.a_fund as i64 - observed_balance as i64,
         tx_metrics: vec![funding_tx],
         scan_metrics: None,
+        recorded_birth_height: Some(h_birth),
     })
 }
 
@@ -153,6 +155,7 @@ pub async fn run_s2(
         balance_delta: expected_balance as i64 - observed_balance as i64,
         tx_metrics: Vec::new(),
         scan_metrics: Some(scan_metrics),
+        recorded_birth_height: None,
     })
 }
 
@@ -175,6 +178,7 @@ pub async fn run_s3(
         balance_delta: expected_balance as i64 - observed_balance as i64,
         tx_metrics: Vec::new(),
         scan_metrics: Some(scan_metrics),
+        recorded_birth_height: None,
     })
 }
 
@@ -311,6 +315,7 @@ pub async fn run_s6(
         balance_delta: expected_balance as i64 - observed_balance as i64,
         tx_metrics: Vec::new(),
         scan_metrics: Some(scan_metrics),
+        recorded_birth_height: None,
     })
 }
 
@@ -333,6 +338,7 @@ pub async fn run_s7(
         balance_delta: expected_balance as i64 - observed_balance as i64,
         tx_metrics: Vec::new(),
         scan_metrics: Some(scan_metrics),
+        recorded_birth_height: None,
     })
 }
 
@@ -343,11 +349,12 @@ pub async fn run_all_scenarios(
     let mut scenarios = Vec::new();
 
     scenarios.push(run_b0(driver).await?);
-    scenarios.push(run_s0(driver, config).await?);
+    let s0 = run_s0(driver, config).await?;
+    let h_birth = s0.recorded_birth_height.unwrap_or(0);
+    scenarios.push(s0);
     scenarios.push(run_s1(driver, config).await?);
     let post_s1_balance = driver.get_balance().await?;
 
-    let h_birth = driver.get_tip_height().await.unwrap_or(0);
     driver.reset().await?;
     scenarios.push(run_s2(driver, post_s1_balance).await?);
     driver.reset().await?;
@@ -356,11 +363,10 @@ pub async fn run_all_scenarios(
     scenarios.push(run_s5(driver, config).await?);
     let post_s5_balance = driver.get_balance().await?;
 
-    let h_birth_after_s5 = driver.get_tip_height().await.unwrap_or(h_birth);
     driver.reset().await?;
     scenarios.push(run_s6(driver, post_s5_balance).await?);
     driver.reset().await?;
-    scenarios.push(run_s7(driver, h_birth_after_s5, post_s5_balance).await?);
+    scenarios.push(run_s7(driver, h_birth, post_s5_balance).await?);
 
     Ok(scenarios)
 }
@@ -386,6 +392,7 @@ fn finalize_scenario(
         balance_delta: expected_balance as i64 - observed_balance as i64,
         tx_metrics,
         scan_metrics,
+        recorded_birth_height: None,
     }
 }
 

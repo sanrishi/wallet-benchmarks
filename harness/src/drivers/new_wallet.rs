@@ -25,6 +25,7 @@ use tari_transaction_components::{
         models::{PrepareOneSidedTransactionForSigningResult, TransactionResult},
         sign_locked_transaction,
     },
+    tari_amount::MicroMinotari,
 };
 use tempfile::NamedTempFile;
 use tokio::process::Command;
@@ -183,64 +184,12 @@ impl NewWalletDriver {
             .next_back()
             .map(str::trim)
             .ok_or_else(|| anyhow!("balance output did not contain a parsable amount"))?;
-
-        let numeric = amount
-            .chars()
-            .take_while(|ch| ch.is_ascii_digit() || matches!(ch, '.' | ','))
-            .collect::<String>();
-        let suffix = amount[numeric.len()..].trim();
-        let numeric = numeric.replace(',', "");
-
-        if suffix == "T" {
-            return Self::parse_tari_to_micro_tari(&numeric);
-        }
-
-        if suffix.contains('T') {
-            return numeric
-                .parse::<u64>()
-                .with_context(|| format!("failed to parse microTari balance from '{amount}'"));
-        }
-
-        Err(anyhow!("unsupported balance output format: {amount}"))
-    }
-
-    fn parse_tari_to_micro_tari(value: &str) -> anyhow::Result<u64> {
-        let (whole, fractional) = match value.split_once('.') {
-            Some((whole, fractional)) => (whole.trim(), fractional.trim()),
-            None => (value.trim(), ""),
-        };
-
-        let whole = whole
-            .parse::<u64>()
-            .with_context(|| format!("failed to parse Tari whole units from '{value}'"))?;
-
-        let fractional_digits = fractional
-            .chars()
-            .take_while(|ch| ch.is_ascii_digit())
-            .collect::<String>();
-        if fractional_digits.len() > 6 {
-            return Err(anyhow!(
-                "too many fractional Tari digits in '{value}', expected at most 6"
-            ));
-        }
-
-        let mut fractional_padded = fractional_digits;
-        while fractional_padded.len() < 6 {
-            fractional_padded.push('0');
-        }
-
-        let fractional = if fractional_padded.is_empty() {
-            0
-        } else {
-            fractional_padded
-                .parse::<u64>()
-                .with_context(|| format!("failed to parse Tari fractional units from '{value}'"))?
-        };
-
-        whole
-            .checked_mul(1_000_000)
-            .and_then(|base| base.checked_add(fractional))
-            .ok_or_else(|| anyhow!("Tari balance overflow while converting '{value}'"))
+        let amount = amount
+            .replace(',', "")
+            .replace("ÂµT", "µT");
+        let amount = MicroMinotari::from_str(&amount)
+            .with_context(|| format!("failed to parse balance amount '{amount}'"))?;
+        Ok(amount.as_u64())
     }
 
     async fn ensure_wallet_initialized(&self) -> anyhow::Result<()> {

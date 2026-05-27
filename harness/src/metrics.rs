@@ -30,6 +30,8 @@ pub struct ScenarioResult {
     pub balance_delta: i64,
     pub tx_metrics: Vec<TxMetrics>,
     pub scan_metrics: Option<ScanMetrics>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub recorded_birth_height: Option<u64>,
 }
 
 #[derive(Debug, serde::Serialize)]
