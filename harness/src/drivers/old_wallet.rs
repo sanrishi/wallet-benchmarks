@@ -6,7 +6,7 @@ use std::str::FromStr;
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use reqwest::Client;
 use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
 use tari_common_types::seeds::{
@@ -68,17 +68,9 @@ impl OldWalletDriver {
     fn load_or_create_seed_words(data_dir: &std::path::Path) -> anyhow::Result<String> {
         let seed_words_path = Self::seed_words_path(data_dir);
         match fs::read_to_string(&seed_words_path) {
-            Ok(seed_words) => {
-                let normalized = Self::normalize_seed_birthday(seed_words.trim())?;
-                if normalized != seed_words.trim() {
-                    fs::write(&seed_words_path, &normalized)?;
-                }
-                Ok(normalized)
-            }
+            Ok(seed_words) => Ok(seed_words.trim().to_string()),
             Err(error) if error.kind() == ErrorKind::NotFound => {
-                let mut seed = CipherSeed::random();
-                seed.change_birthday(0);
-                let seed_words = seed
+                let seed_words = CipherSeed::random()
                     .to_mnemonic(MnemonicLanguage::English, None)?
                     .join(" ")
                     .reveal()
@@ -90,17 +82,22 @@ impl OldWalletDriver {
         }
     }
 
-    fn normalize_seed_birthday(seed_words: &str) -> anyhow::Result<String> {
+    fn seed_words_with_birthday(seed_words: &str, birthday: u64) -> anyhow::Result<String> {
         let mnemonic = tari_common_types::seeds::seed_words::SeedWords::from_str(seed_words)?;
         let mut seed = CipherSeed::from_mnemonic(&mnemonic, None)?;
-        if seed.birthday() != 0 {
-            seed.change_birthday(0);
-        }
+        let birthday = u16::try_from(birthday)
+            .with_context(|| format!("birthday {birthday} exceeds u16 range for old_wallet"))?;
+        seed.change_birthday(birthday);
         Ok(seed
             .to_mnemonic(MnemonicLanguage::English, None)?
             .join(" ")
             .reveal()
             .to_string())
+    }
+
+    pub fn set_seed_birthday(&mut self, birthday: u64) -> anyhow::Result<()> {
+        self.seed_words = Self::seed_words_with_birthday(&self.seed_words, birthday)?;
+        Ok(())
     }
 
     /// Spawn the wallet process and block until gRPC port responds or timeout
@@ -534,7 +531,7 @@ impl WalletDriver for OldWalletDriver {
         recipients: Vec<(String, u64)>,
         fee_rate: u64,
     ) -> anyhow::Result<TxMetrics> {
-        self.transfer_recipients(recipients, fee_rate, false).await
+        self.transfer_recipients(recipients, fee_rate, true).await
     }
 
     async fn observe_funding(&self, expected_amount_ut: u64) -> anyhow::Result<TxMetrics> {

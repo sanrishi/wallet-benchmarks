@@ -31,7 +31,7 @@ async fn run_old_wallet_scenarios(
     old_wallet: &mut OldWalletDriver,
     config: &Config,
 ) -> anyhow::Result<Vec<ScenarioResult>> {
-    restart_old_wallet_for_scan(old_wallet).await?;
+    restart_old_wallet_for_scan(old_wallet, 0).await?;
     print_old_wallet_address(old_wallet).await;
     let guard = OldWalletGuard { driver: old_wallet };
     let mut scenarios = Vec::new();
@@ -42,10 +42,10 @@ async fn run_old_wallet_scenarios(
 
     let h_birth = guard.driver.get_tip_height().await.unwrap_or(0);
 
-    restart_old_wallet_for_scan(guard.driver).await?;
+    restart_old_wallet_for_scan(guard.driver, 0).await?;
     scenarios.push(run_s2(&*guard.driver, post_s1_balance).await?);
 
-    restart_old_wallet_for_scan(guard.driver).await?;
+    restart_old_wallet_for_scan(guard.driver, h_birth).await?;
     scenarios.push(run_s3(&*guard.driver, h_birth, post_s1_balance).await?);
 
     scenarios.push(run_s4(&*guard.driver, config).await?);
@@ -54,18 +54,19 @@ async fn run_old_wallet_scenarios(
 
     let h_birth_after_s5 = guard.driver.get_tip_height().await.unwrap_or(h_birth);
 
-    restart_old_wallet_for_scan(guard.driver).await?;
+    restart_old_wallet_for_scan(guard.driver, 0).await?;
     scenarios.push(run_s6(&*guard.driver, post_s5_balance).await?);
 
-    restart_old_wallet_for_scan(guard.driver).await?;
+    restart_old_wallet_for_scan(guard.driver, h_birth_after_s5).await?;
     scenarios.push(run_s7(&*guard.driver, h_birth_after_s5, post_s5_balance).await?);
 
     Ok(scenarios)
 }
 
-async fn restart_old_wallet_for_scan(old_wallet: &mut OldWalletDriver) -> anyhow::Result<()> {
+async fn restart_old_wallet_for_scan(old_wallet: &mut OldWalletDriver, birthday: u64) -> anyhow::Result<()> {
     old_wallet.stop();
     old_wallet.reset().await?;
+    old_wallet.set_seed_birthday(birthday)?;
     old_wallet.start().await
 }
 

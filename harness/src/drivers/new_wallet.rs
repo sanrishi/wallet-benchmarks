@@ -80,14 +80,7 @@ impl NewWalletDriver {
         let database_path = data_dir.join("wallet.db");
 
         match fs::read_to_string(&seed_words_path) {
-            Ok(seed_words) => {
-                let normalized = Self::normalize_seed_words(seed_words.trim())?;
-                if normalized != seed_words.trim() {
-                    fs::write(&seed_words_path, &normalized)
-                        .with_context(|| format!("failed to rewrite {}", seed_words_path.display()))?;
-                }
-                return Ok(normalized);
-            }
+            Ok(seed_words) => return Ok(seed_words.trim().to_string()),
             Err(error) if error.kind() == io::ErrorKind::NotFound => {}
             Err(error) => {
                 return Err(error).with_context(|| {
@@ -104,9 +97,7 @@ impl NewWalletDriver {
             ));
         }
 
-        let mut seed = CipherSeed::random();
-        seed.change_birthday(0);
-        let seed_words = seed
+        let seed_words = CipherSeed::random()
             .to_mnemonic(MnemonicLanguage::English, None)
             .context("failed to generate mnemonic seed words for new_wallet")?
             .join(" ")
@@ -117,19 +108,48 @@ impl NewWalletDriver {
         Ok(seed_words)
     }
 
-    fn normalize_seed_words(seed_words: &str) -> anyhow::Result<String> {
-        let mnemonic = SeedWords::from_str(seed_words)
+    fn seed_words_with_birthday(&self, birthday: u64) -> anyhow::Result<String> {
+        let mnemonic = SeedWords::from_str(&self.seed_words)
             .context("failed to parse stored seed words for new_wallet")?;
         let mut seed = CipherSeed::from_mnemonic(&mnemonic, None)
             .context("failed to reconstruct cipher seed for new_wallet")?;
-        if seed.birthday() != 0 {
-            seed.change_birthday(0);
-        }
+        let birthday = u16::try_from(birthday)
+            .with_context(|| format!("birthday {birthday} exceeds u16 range for new_wallet"))?;
+        seed.change_birthday(birthday);
         Ok(seed
             .to_mnemonic(MnemonicLanguage::English, None)?
             .join(" ")
             .reveal()
             .to_string())
+    }
+
+    async fn ensure_wallet_initialized_with_seed_words(&self, seed_words: &str) -> anyhow::Result<()> {
+        std::fs::create_dir_all(&self.data_dir)
+            .with_context(|| format!("failed to create {}", self.data_dir.display()))?;
+
+        if self.database_path().exists() {
+            return Ok(());
+        }
+
+        let database_path = self.database_path();
+        let database_path = database_path
+            .to_str()
+            .ok_or_else(|| anyhow!("database path is not valid UTF-8"))?;
+
+        self.run_cli_command(&[
+            "create",
+            "--password",
+            &self.password,
+            "--database-path",
+            database_path,
+            "--account-name",
+            DEFAULT_ACCOUNT_NAME,
+            "--seed-words",
+            seed_words,
+        ])
+        .await?;
+
+        Ok(())
     }
 
     async fn run_cli_command(&self, args: &[&str]) -> anyhow::Result<String> {
@@ -224,32 +244,7 @@ impl NewWalletDriver {
     }
 
     async fn ensure_wallet_initialized(&self) -> anyhow::Result<()> {
-        std::fs::create_dir_all(&self.data_dir)
-            .with_context(|| format!("failed to create {}", self.data_dir.display()))?;
-
-        if self.database_path().exists() {
-            return Ok(());
-        }
-
-        let database_path = self.database_path();
-        let database_path = database_path
-            .to_str()
-            .ok_or_else(|| anyhow!("database path is not valid UTF-8"))?;
-
-        self.run_cli_command(&[
-            "create",
-            "--password",
-            &self.password,
-            "--database-path",
-            database_path,
-            "--account-name",
-            DEFAULT_ACCOUNT_NAME,
-            "--seed-words",
-            &self.seed_words,
-        ])
-        .await?;
-
-        Ok(())
+        self.ensure_wallet_initialized_with_seed_words(&self.seed_words).await
     }
 
     fn key_manager(&self) -> anyhow::Result<KeyManager> {
@@ -446,8 +441,9 @@ impl NewWalletDriver {
             .unwrap_or(false)
     }
 
-    async fn scan_from_height(&self, from_height: u64) -> anyhow::Result<ScanMetrics> {
-        self.ensure_wallet_initialized().await?;
+    async fn scan_from_height(&self, from_height: u64, seed_birthday: u64) -> anyhow::Result<ScanMetrics> {
+        let seed_words = self.seed_words_with_birthday(seed_birthday)?;
+        self.ensure_wallet_initialized_with_seed_words(&seed_words).await?;
 
         let database_path = self.database_path();
         let database_path = database_path
@@ -681,11 +677,11 @@ impl WalletDriver for NewWalletDriver {
     }
 
     async fn scan_from_genesis(&self) -> anyhow::Result<ScanMetrics> {
-        self.scan_from_height(0).await
+        self.scan_from_height(0, 0).await
     }
 
     async fn scan_from_birthday(&self, height: u64) -> anyhow::Result<ScanMetrics> {
-        self.scan_from_height(height).await
+        self.scan_from_height(height, height).await
     }
 
     async fn send_single(

@@ -348,14 +348,18 @@ pub async fn run_all_scenarios(
     let post_s1_balance = driver.get_balance().await?;
 
     let h_birth = driver.get_tip_height().await.unwrap_or(0);
+    driver.reset().await?;
     scenarios.push(run_s2(driver, post_s1_balance).await?);
+    driver.reset().await?;
     scenarios.push(run_s3(driver, h_birth, post_s1_balance).await?);
     scenarios.push(run_s4(driver, config).await?);
     scenarios.push(run_s5(driver, config).await?);
     let post_s5_balance = driver.get_balance().await?;
 
     let h_birth_after_s5 = driver.get_tip_height().await.unwrap_or(h_birth);
+    driver.reset().await?;
     scenarios.push(run_s6(driver, post_s5_balance).await?);
+    driver.reset().await?;
     scenarios.push(run_s7(driver, h_birth_after_s5, post_s5_balance).await?);
 
     Ok(scenarios)
