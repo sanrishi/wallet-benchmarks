@@ -145,12 +145,13 @@ impl OldWalletDriver {
         Err(anyhow!("wallet returned no printable address"))
     }
 
-    async fn get_unspent_output_count(&self) -> anyhow::Result<u64> {
-        use tari_rpc::wallet_client::WalletClient;
-
-        let mut client = WalletClient::connect(self.grpc_url.clone()).await?;
-        let resp = client.get_unspent_amounts(tari_rpc::Empty {}).await?.into_inner();
-        Ok(resp.amount.len() as u64)
+    fn console_wallet_db_path(&self) -> PathBuf {
+        self.data_dir
+            .join("esmeralda")
+            .join("data")
+            .join("wallet")
+            .join("db")
+            .join("console_wallet.db")
     }
 
     async fn get_scanned_height(&self) -> anyhow::Result<u64> {
@@ -227,7 +228,7 @@ impl OldWalletDriver {
 
         let wall_clock_secs = started_at.elapsed().as_secs_f64();
         let scanned_blocks = target_tip.saturating_sub(from_height);
-        let outputs_found = self.get_unspent_output_count().await?;
+        let outputs_found = shared::count_unspent_outputs(&self.console_wallet_db_path())?;
         let blocks_per_sec = if wall_clock_secs > 0.0 {
             scanned_blocks as f64 / wall_clock_secs
         } else {

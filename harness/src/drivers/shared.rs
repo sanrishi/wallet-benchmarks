@@ -1,7 +1,8 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use anyhow::Context;
+use rusqlite::Connection;
 use serde::Deserialize;
 use tari_common_types::seeds::{
     cipher_seed::CipherSeed,
@@ -73,6 +74,28 @@ pub fn parse_balance_output(stdout: &str) -> anyhow::Result<u64> {
     let amount = MicroMinotari::from_str(&amount)
         .with_context(|| format!("failed to parse balance amount '{amount}'"))?;
     Ok(amount.as_u64())
+}
+
+/// Count unspent outputs by querying the wallet SQLite database directly.
+///
+/// Queries `SELECT COUNT(*) FROM outputs WHERE deleted_at IS NULL AND status = 'UNSPENT'`
+/// from the given database file. Returns 0 if the table is empty or does not exist.
+pub fn count_unspent_outputs(db_path: &Path) -> anyhow::Result<u64> {
+    let connection = Connection::open(db_path)
+        .with_context(|| format!("failed to open wallet database at {}", db_path.display()))?;
+    let count: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM outputs WHERE deleted_at IS NULL AND status = 'UNSPENT'",
+            [],
+            |row| row.get(0),
+        )
+        .with_context(|| {
+            format!(
+                "failed to query unspent outputs from wallet database at {}",
+                db_path.display()
+            )
+        })?;
+    Ok(count.max(0) as u64)
 }
 
 /// Response from the base-node `/get_tip_info` HTTP endpoint.

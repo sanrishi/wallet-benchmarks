@@ -9,7 +9,6 @@ use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, Context};
 use reqwest::Client;
-use rusqlite::Connection;
 use serde::Deserialize;
 use tari_common::configuration::Network;
 use tari_common_types::seeds::{
@@ -32,8 +31,8 @@ use tokio::process::Command;
 use crate::driver::WalletDriver;
 use crate::drivers::shared;
 use crate::drivers::shared::{
-    block_height_to_birthday, parse_balance_output, seed_words_path, seed_words_with_birthday,
-    DEFAULT_ACCOUNT_NAME,
+    block_height_to_birthday, count_unspent_outputs, parse_balance_output, seed_words_path,
+    seed_words_with_birthday, DEFAULT_ACCOUNT_NAME,
 };
 use crate::metrics::{ScanMetrics, TxMetrics};
 
@@ -227,19 +226,6 @@ impl NewWalletDriver {
         }
     }
 
-    fn get_unspent_output_count(&self) -> anyhow::Result<u64> {
-        let connection = Connection::open(self.database_path())
-            .context("failed to open new_wallet database for output counting")?;
-        let count: i64 = connection
-            .query_row(
-                "SELECT COUNT(*) FROM outputs WHERE deleted_at IS NULL AND status = 'UNSPENT'",
-                [],
-                |row| row.get(0),
-            )
-            .context("failed to query unspent outputs from new_wallet database")?;
-        Ok(count.max(0) as u64)
-    }
-
     /// Find a free ephemeral port.
     ///
     /// # TOCTOU note
@@ -422,7 +408,7 @@ impl NewWalletDriver {
         let scan_status = self.get_scan_status(&daemon).await?;
         let _ = daemon.stop().await;
         let scanned_tip_height = scan_status.last_scanned_height;
-        let outputs_found = self.get_unspent_output_count()?;
+        let outputs_found = count_unspent_outputs(&self.database_path())?;
         let scanned_blocks = scanned_tip_height.saturating_sub(from_height);
         let blocks_per_sec = if wall_clock_secs > 0.0 {
             scanned_blocks as f64 / wall_clock_secs
