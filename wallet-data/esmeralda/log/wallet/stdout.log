@@ -1,0 +1,10 @@
+2026-05-23 20:32:06.056005200 [wallet::console_wallet::main] INFO  Starting Minotari Console Wallet version: 5.3.1-pre.3-9a442c05dd4d1f3ca9936fbd22728d55c4bf4040-release // applications\minotari_console_wallet\src\main.rs:104
+2026-05-23 20:32:06.113203600 [wallet::console_wallet::main] INFO  == Minotari Wallet (5.3.1-pre.3-9a442c05dd4d1f3ca9936fbd22728d55c4bf4040-release) == // applications\minotari_console_wallet\src\lib.rs:122
+2026-05-23 20:32:06.321799600 [wallet] INFO  Transaction sending mechanism is 'DirectAndStoreAndForward' // base_layer\wallet\src\wallet.rs:156
+2026-05-23 20:32:06.323961800 [wallet::base_node_service] INFO  Wallet base node service initializing. // base_layer\wallet\src\base_node_service\mod.rs:72
+2026-05-23 20:32:06.326317500 [wallet::utxo_scanning] INFO  UtxoScanningMode: UTXO scanning service starting // base_layer\wallet\src\utxo_scanner_service\service.rs:122
+2026-05-23 20:32:06.336328800 [wallet::utxo_scanning] INFO  UTXO scanning round started // base_layer\wallet\src\utxo_scanner_service\service.rs:150
+2026-05-23 20:32:06.337038900 [wallet::utxo_scanning] INFO  Starting UTXO scanning task // base_layer\wallet\src\utxo_scanner_service\utxo_scanner_task.rs:242
+2026-05-23 20:32:06.338860400 [wallet::transaction_service::database::wallet] INFO  check_lock_height_status: Found 0 confirmed transactions with lock_height > tip (657285), updating to locked // base_layer\wallet\src\transaction_service\storage\sqlite_db.rs:1576
+2026-05-23 20:32:06.358902600 [wallet::app::main] INFO  Starting grpc server // applications\minotari_console_wallet\src\wallet_modes.rs:364
+2026-05-23 20:32:06.359906500 [wallet::app::main] INFO  Starting GRPC on /ip4/127.0.0.1/tcp/18143 // applications\minotari_console_wallet\src\wallet_modes.rs:412

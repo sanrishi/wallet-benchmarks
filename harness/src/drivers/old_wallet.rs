@@ -2,11 +2,10 @@ use std::fs;
 use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::process::{Child, Command};
-use std::str::FromStr;
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
-use anyhow::{anyhow, Context};
+use anyhow::anyhow;
 use reqwest::Client;
 use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
 use tari_common_types::seeds::{
@@ -15,6 +14,8 @@ use tari_common_types::seeds::{
 };
 
 use crate::driver::WalletDriver;
+use crate::drivers::shared;
+use crate::drivers::shared::{block_height_to_birthday, seed_words_path, seed_words_with_birthday};
 use crate::metrics::{ScanMetrics, TxMetrics};
 
 // Include tonic-generated gRPC types from wallet.proto
@@ -61,13 +62,9 @@ impl OldWalletDriver {
         })
     }
 
-    fn seed_words_path(data_dir: &std::path::Path) -> PathBuf {
-        data_dir.join("seed_words.txt")
-    }
-
     fn load_or_create_seed_words(data_dir: &std::path::Path) -> anyhow::Result<String> {
-        let seed_words_path = Self::seed_words_path(data_dir);
-        match fs::read_to_string(&seed_words_path) {
+        let words_path = seed_words_path(data_dir);
+        match fs::read_to_string(&words_path) {
             Ok(seed_words) => Ok(seed_words.trim().to_string()),
             Err(error) if error.kind() == ErrorKind::NotFound => {
                 let seed_words = CipherSeed::random()
@@ -75,28 +72,16 @@ impl OldWalletDriver {
                     .join(" ")
                     .reveal()
                     .to_string();
-                fs::write(&seed_words_path, &seed_words)?;
+                fs::write(&words_path, &seed_words)?;
                 Ok(seed_words)
             }
             Err(error) => Err(error.into()),
         }
     }
 
-    fn seed_words_with_birthday(seed_words: &str, birthday: u64) -> anyhow::Result<String> {
-        let mnemonic = tari_common_types::seeds::seed_words::SeedWords::from_str(seed_words)?;
-        let mut seed = CipherSeed::from_mnemonic(&mnemonic, None)?;
-        let birthday = u16::try_from(birthday)
-            .with_context(|| format!("birthday {birthday} exceeds u16 range for old_wallet"))?;
-        seed.change_birthday(birthday);
-        Ok(seed
-            .to_mnemonic(MnemonicLanguage::English, None)?
-            .join(" ")
-            .reveal()
-            .to_string())
-    }
-
-    pub fn set_seed_birthday(&mut self, birthday: u64) -> anyhow::Result<()> {
-        self.seed_words = Self::seed_words_with_birthday(&self.seed_words, birthday)?;
+    pub fn set_seed_birthday(&mut self, block_height: u64) -> anyhow::Result<()> {
+        let birthday_days = block_height_to_birthday(block_height) as u64;
+        self.seed_words = seed_words_with_birthday(&self.seed_words, birthday_days)?;
         Ok(())
     }
 
@@ -179,7 +164,7 @@ impl OldWalletDriver {
 
     async fn get_base_node_tip_height(&self) -> anyhow::Result<u64> {
         let url = format!("{}/get_tip_info", self.base_node_url.trim_end_matches('/'));
-        let tip: TipInfoResponse = self
+        let tip: shared::TipInfoResponse = self
             .http_client
             .get(url)
             .send()
@@ -426,16 +411,6 @@ impl OldWalletDriver {
             .max_by_key(|tx| tx.timestamp)
             .map(|tx| tx.tx_id.to_string()))
     }
-}
-
-#[derive(Debug, serde::Deserialize)]
-struct TipInfoResponse {
-    metadata: TipMetadata,
-}
-
-#[derive(Debug, serde::Deserialize)]
-struct TipMetadata {
-    best_block_height: u64,
 }
 
 #[async_trait]

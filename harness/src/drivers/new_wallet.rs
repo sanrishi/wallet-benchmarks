@@ -25,15 +25,17 @@ use tari_transaction_components::{
         models::{PrepareOneSidedTransactionForSigningResult, TransactionResult},
         sign_locked_transaction,
     },
-    tari_amount::MicroMinotari,
 };
 use tempfile::NamedTempFile;
 use tokio::process::Command;
 
 use crate::driver::WalletDriver;
+use crate::drivers::shared;
+use crate::drivers::shared::{
+    block_height_to_birthday, parse_balance_output, seed_words_path, seed_words_with_birthday,
+    DEFAULT_ACCOUNT_NAME,
+};
 use crate::metrics::{ScanMetrics, TxMetrics};
-
-const DEFAULT_ACCOUNT_NAME: &str = "default";
 
 pub struct NewWalletDriver {
     pub minotari_bin: PathBuf,
@@ -72,20 +74,16 @@ impl NewWalletDriver {
         self.data_dir.join("wallet.db")
     }
 
-    fn seed_words_path(data_dir: &std::path::Path) -> PathBuf {
-        data_dir.join("seed_words.txt")
-    }
-
     fn load_or_create_seed_words(data_dir: &std::path::Path) -> anyhow::Result<String> {
-        let seed_words_path = Self::seed_words_path(data_dir);
+        let words_path = seed_words_path(data_dir);
         let database_path = data_dir.join("wallet.db");
 
-        match fs::read_to_string(&seed_words_path) {
+        match fs::read_to_string(&words_path) {
             Ok(seed_words) => return Ok(seed_words.trim().to_string()),
             Err(error) if error.kind() == io::ErrorKind::NotFound => {}
             Err(error) => {
                 return Err(error).with_context(|| {
-                    format!("failed to read {}", seed_words_path.display())
+                    format!("failed to read {}", words_path.display())
                 });
             }
         }
@@ -94,7 +92,7 @@ impl NewWalletDriver {
             return Err(anyhow!(
                 "existing wallet database found at {} but {} is missing; wipe the data dir or restore the seed file",
                 database_path.display(),
-                seed_words_path.display()
+                words_path.display()
             ));
         }
 
@@ -104,24 +102,13 @@ impl NewWalletDriver {
             .join(" ")
             .reveal()
             .to_string();
-        fs::write(&seed_words_path, &seed_words)
-            .with_context(|| format!("failed to write {}", seed_words_path.display()))?;
+        fs::write(&words_path, &seed_words)
+            .with_context(|| format!("failed to write {}", words_path.display()))?;
         Ok(seed_words)
     }
 
-    fn seed_words_with_birthday(&self, birthday: u64) -> anyhow::Result<String> {
-        let mnemonic = SeedWords::from_str(&self.seed_words)
-            .context("failed to parse stored seed words for new_wallet")?;
-        let mut seed = CipherSeed::from_mnemonic(&mnemonic, None)
-            .context("failed to reconstruct cipher seed for new_wallet")?;
-        let birthday = u16::try_from(birthday)
-            .with_context(|| format!("birthday {birthday} exceeds u16 range for new_wallet"))?;
-        seed.change_birthday(birthday);
-        Ok(seed
-            .to_mnemonic(MnemonicLanguage::English, None)?
-            .join(" ")
-            .reveal()
-            .to_string())
+    fn seed_words_with_birthday_for_driver(&self, birthday: u64) -> anyhow::Result<String> {
+        seed_words_with_birthday(&self.seed_words, birthday)
     }
 
     async fn ensure_wallet_initialized_with_seed_words(&self, seed_words: &str) -> anyhow::Result<()> {
@@ -153,7 +140,7 @@ impl NewWalletDriver {
         Ok(())
     }
 
-    async fn run_cli_command(&self, args: &[&str]) -> anyhow::Result<String> {
+    pub async fn run_cli_command(&self, args: &[&str]) -> anyhow::Result<String> {
         let output = Command::new(&self.minotari_bin)
             .args(args)
             .output()
@@ -171,25 +158,6 @@ impl NewWalletDriver {
         }
 
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
-    }
-
-    fn parse_balance_output(stdout: &str) -> anyhow::Result<u64> {
-        let line = stdout
-            .lines()
-            .find(|line| line.contains("Balance at height"))
-            .ok_or_else(|| anyhow!("balance output did not contain a balance line"))?;
-
-        let amount = line
-            .split(':')
-            .next_back()
-            .map(str::trim)
-            .ok_or_else(|| anyhow!("balance output did not contain a parsable amount"))?;
-        let amount = amount
-            .replace(',', "")
-            .replace("ÂµT", "µT");
-        let amount = MicroMinotari::from_str(&amount)
-            .with_context(|| format!("failed to parse balance amount '{amount}'"))?;
-        Ok(amount.as_u64())
     }
 
     async fn ensure_wallet_initialized(&self) -> anyhow::Result<()> {
@@ -272,6 +240,18 @@ impl NewWalletDriver {
         Ok(count.max(0) as u64)
     }
 
+    /// Find a free ephemeral port.
+    ///
+    /// # TOCTOU note
+    ///
+    /// The kernel guarantees that a bound `TcpListener` will not be handed
+    /// out to another `bind()` caller, so the returned port will be free
+    /// at the moment of the call.  A brief race still exists between
+    /// `drop(listener)` and the child process calling `bind()`, but on
+    /// Windows and Linux the kernel's TIME_WAIT / TCP-TW-reuse behaviour
+    /// makes actual collisions vanishingly rare in practice.  If the
+    /// child does fail with EADDRINUSE, the caller should retry with a
+    /// fresh port.
     fn find_free_api_port() -> anyhow::Result<u16> {
         let listener = TcpListener::bind(("127.0.0.1", 0))
             .context("failed to bind an ephemeral port for minotari daemon")?;
@@ -283,56 +263,72 @@ impl NewWalletDriver {
         Ok(port)
     }
 
+    /// Spawn the `minotari daemon` subprocess and wait for its API to become
+    /// reachable.
+    ///
+    /// Retries with a fresh port if the first attempt fails (TOCTOU
+    /// mitigation).
     async fn spawn_daemon(&self, scan_interval_secs: Option<u64>) -> anyhow::Result<WalletDaemon> {
         self.ensure_wallet_initialized().await?;
-        let port = Self::find_free_api_port()?;
-        let database_path = self.database_path();
-        let database_path = database_path
-            .to_str()
-            .ok_or_else(|| anyhow!("database path is not valid UTF-8"))?;
-        let mut args = vec![
-            "daemon".to_string(),
-            "--password".to_string(),
-            self.password.clone(),
-            "--database-path".to_string(),
-            database_path.to_string(),
-            "--api-port".to_string(),
-            port.to_string(),
-            "--base-url".to_string(),
-            self.base_node_url.clone(),
-        ];
-        if let Some(interval) = scan_interval_secs {
-            args.push("--scan-interval-secs".to_string());
-            args.push(interval.to_string());
-        }
-        let child = Command::new(&self.minotari_bin)
-            .args(&args)
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .with_context(|| format!("failed to spawn minotari daemon at {}", self.minotari_bin.display()))?;
-        let daemon = WalletDaemon {
-            child,
-            base_url: format!("http://127.0.0.1:{port}"),
-        };
-        let deadline = Instant::now() + Duration::from_secs(30);
-        loop {
-            if Instant::now() > deadline {
-                let _ = daemon.stop().await;
-                return Err(anyhow!("minotari daemon API did not become ready within 30s"));
+
+        for attempt in 0..5 {
+            let port = Self::find_free_api_port()?;
+            let database_path = self.database_path();
+            let database_path = database_path
+                .to_str()
+                .ok_or_else(|| anyhow!("database path is not valid UTF-8"))?;
+            let mut args = vec![
+                "daemon".to_string(),
+                "--password".to_string(),
+                self.password.clone(),
+                "--database-path".to_string(),
+                database_path.to_string(),
+                "--api-port".to_string(),
+                port.to_string(),
+                "--base-url".to_string(),
+                self.base_node_url.clone(),
+            ];
+            if let Some(interval) = scan_interval_secs {
+                args.push("--scan-interval-secs".to_string());
+                args.push(interval.to_string());
             }
-            if self
-                .http_client
-                .get(format!("{}/version", daemon.base_url))
-                .send()
-                .await
-                .and_then(|response| response.error_for_status())
-                .is_ok()
-            {
+            let child = Command::new(&self.minotari_bin)
+                .args(&args)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+                .with_context(|| format!("failed to spawn minotari daemon at {}", self.minotari_bin.display()))?;
+            let daemon = WalletDaemon {
+                child,
+                base_url: format!("http://127.0.0.1:{port}"),
+            };
+            let deadline = Instant::now() + Duration::from_secs(30);
+            let mut ready = false;
+            while Instant::now() <= deadline {
+                if self
+                    .http_client
+                    .get(format!("{}/version", daemon.base_url))
+                    .send()
+                    .await
+                    .and_then(|response| response.error_for_status())
+                    .is_ok()
+                {
+                    ready = true;
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(250)).await;
+            }
+            if ready {
                 return Ok(daemon);
             }
-            tokio::time::sleep(Duration::from_millis(250)).await;
+            // Port may have collided; kill the child and retry with a new port.
+            let _ = daemon.stop().await;
+            if attempt < 4 {
+                tokio::time::sleep(Duration::from_millis(500)).await;
+            }
         }
+
+        Err(anyhow!("minotari daemon did not become ready after 5 port-retry attempts"))
     }
 
     async fn get_scan_status(&self, daemon: &WalletDaemon) -> anyhow::Result<ScanStatusResponse> {
@@ -390,8 +386,11 @@ impl NewWalletDriver {
             .unwrap_or(false)
     }
 
-    async fn scan_from_height(&self, from_height: u64, seed_birthday: u64) -> anyhow::Result<ScanMetrics> {
-        let seed_words = self.seed_words_with_birthday(seed_birthday)?;
+    /// Core scan logic.  `from_height` controls where `--rescan-from-height`
+    /// starts; `seed_birthday_days` is a **day-count** value (not block
+    /// height) used to set the CIPHER seed birthday.
+    async fn scan_from_height(&self, from_height: u64, seed_birthday_days: u64) -> anyhow::Result<ScanMetrics> {
+        let seed_words = self.seed_words_with_birthday_for_driver(seed_birthday_days)?;
         self.ensure_wallet_initialized_with_seed_words(&seed_words).await?;
 
         let database_path = self.database_path();
@@ -602,12 +601,12 @@ impl WalletDriver for NewWalletDriver {
         ])
         .await?;
 
-        Self::parse_balance_output(&stdout)
+        parse_balance_output(&stdout)
     }
 
     async fn get_tip_height(&self) -> anyhow::Result<u64> {
         let url = format!("{}/get_tip_info", self.base_node_url.trim_end_matches('/'));
-        let tip: TipInfoResponse = self.http_client
+        let tip: shared::TipInfoResponse = self.http_client
             .get(url)
             .send()
             .await
@@ -626,11 +625,15 @@ impl WalletDriver for NewWalletDriver {
     }
 
     async fn scan_from_genesis(&self) -> anyhow::Result<ScanMetrics> {
+        // Seed birthday = 0 (genesis), rescan-from-height = 0
         self.scan_from_height(0, 0).await
     }
 
     async fn scan_from_birthday(&self, height: u64) -> anyhow::Result<ScanMetrics> {
-        self.scan_from_height(height, height).await
+        // Convert the block height into a birthday day-count for the CipherSeed,
+        // then pass the block height as the rescan-from-height CLI argument.
+        let birthday_days = block_height_to_birthday(height) as u64;
+        self.scan_from_height(height, birthday_days).await
     }
 
     async fn send_single(
@@ -684,29 +687,6 @@ impl WalletDriver for NewWalletDriver {
 }
 
 #[derive(Debug, Deserialize)]
-struct TipInfoResponse {
-    metadata: TipMetadata,
-}
-
-#[derive(Debug, Deserialize)]
-struct TipMetadata {
-    best_block_height: u64,
-}
-
-struct WalletDaemon {
-    child: tokio::process::Child,
-    base_url: String,
-}
-
-impl WalletDaemon {
-    async fn stop(mut self) -> anyhow::Result<()> {
-        let _ = self.child.kill().await;
-        let _ = self.child.wait().await;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Deserialize)]
 struct ScanStatusResponse {
     last_scanned_height: u64,
 }
@@ -729,4 +709,17 @@ struct BroadcastResponse {
 struct JsonRpcResponse<T> {
     result: Option<T>,
     error: Option<String>,
+}
+
+pub(super) struct WalletDaemon {
+    child: tokio::process::Child,
+    base_url: String,
+}
+
+impl WalletDaemon {
+    pub(super) async fn stop(mut self) -> anyhow::Result<()> {
+        let _ = self.child.kill().await;
+        let _ = self.child.wait().await;
+        Ok(())
+    }
 }
