@@ -7,15 +7,12 @@ use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::Deserialize;
-use tari_common_types::seeds::{
-    cipher_seed::CipherSeed,
-    mnemonic::{Mnemonic, MnemonicLanguage},
-};
 use tokio::process::{Child, Command};
 
 use crate::driver::WalletDriver;
 use crate::drivers::new_wallet::NewWalletDriver;
-use crate::drivers::shared::{derive_wallet_keys, seed_words_path};
+use crate::drivers::shared;
+use crate::drivers::shared::derive_wallet_keys;
 use crate::metrics::{ScanMetrics, TxMetrics};
 
 #[derive(Debug, Deserialize)]
@@ -108,20 +105,7 @@ impl PaymentProcessorDriver {
     }
 
     fn load_or_create_seed_words(data_dir: &std::path::Path) -> anyhow::Result<String> {
-        let words_path = seed_words_path(data_dir);
-        match std::fs::read_to_string(&words_path) {
-            Ok(seed_words) => Ok(seed_words.trim().to_string()),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                let seed_words = CipherSeed::random()
-                    .to_mnemonic(MnemonicLanguage::English, None)?
-                    .join(" ")
-                    .reveal()
-                    .to_string();
-                std::fs::write(&words_path, &seed_words)?;
-                Ok(seed_words)
-            }
-            Err(e) => Err(e.into()),
-        }
+        shared::load_or_create_seed_words(data_dir)
     }
 
     fn find_free_port() -> anyhow::Result<u16> {

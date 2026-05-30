@@ -9,14 +9,11 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use reqwest::Client;
 use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
-use tari_common_types::seeds::{
-    cipher_seed::CipherSeed,
-    mnemonic::{Mnemonic, MnemonicLanguage},
-};
+
 
 use crate::driver::WalletDriver;
 use crate::drivers::shared;
-use crate::drivers::shared::{block_height_to_birthday, seed_words_path, seed_words_with_birthday};
+use crate::drivers::shared::{seed_words_with_birthday};
 use crate::metrics::{ScanMetrics, TxMetrics};
 
 // Include tonic-generated gRPC types from wallet.proto
@@ -66,25 +63,11 @@ impl OldWalletDriver {
     }
 
     fn load_or_create_seed_words(data_dir: &std::path::Path) -> anyhow::Result<String> {
-        let words_path = seed_words_path(data_dir);
-        match fs::read_to_string(&words_path) {
-            Ok(seed_words) => Ok(seed_words.trim().to_string()),
-            Err(error) if error.kind() == ErrorKind::NotFound => {
-                let seed_words = CipherSeed::random()
-                    .to_mnemonic(MnemonicLanguage::English, None)?
-                    .join(" ")
-                    .reveal()
-                    .to_string();
-                fs::write(&words_path, &seed_words)?;
-                Ok(seed_words)
-            }
-            Err(error) => Err(error.into()),
-        }
+        shared::load_or_create_seed_words(data_dir)
     }
 
-    pub fn set_seed_birthday(&mut self, block_height: u64) -> anyhow::Result<()> {
-        let birthday_days = block_height_to_birthday(block_height) as u64;
-        self.seed_words = seed_words_with_birthday(&self.seed_words, birthday_days)?;
+    pub fn set_seed_birthday(&mut self) -> anyhow::Result<()> {
+        self.seed_words = seed_words_with_birthday(&self.seed_words, 0)?;
         Ok(())
     }
 
@@ -231,16 +214,7 @@ impl OldWalletDriver {
     }
 
     async fn get_base_node_tip_height(&self) -> anyhow::Result<u64> {
-        let url = format!("{}/get_tip_info", self.base_node_url.trim_end_matches('/'));
-        let tip: shared::TipInfoResponse = self
-            .http_client
-            .get(url)
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await?;
-        Ok(tip.metadata.best_block_height)
+        shared::get_tip_height(&self.http_client, &self.base_node_url).await
     }
 
     async fn scan_from_height(&self, from_height: u64) -> anyhow::Result<ScanMetrics> {

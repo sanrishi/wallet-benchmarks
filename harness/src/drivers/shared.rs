@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use anyhow::Context;
+use reqwest::Client;
 use serde::Deserialize;
 use tari_common_types::seeds::{
     cipher_seed::CipherSeed,
@@ -13,40 +14,36 @@ use tari_transaction_components::{
     tari_amount::MicroMinotari,
 };
 
-/// Seconds from Unix epoch (1970-01-01) to the Tari network genesis (2022-01-01 00:00:00 UTC).
-pub const BIRTHDAY_GENESIS_FROM_UNIX_EPOCH: u64 = 1_640_995_200;
-/// Seconds per day.
-pub const SECS_PER_DAY: u64 = 86_400;
-/// Average block time on Esmeralda testnet (seconds).
-pub const AVG_BLOCK_SECS: u64 = 30;
-
 /// Default wallet account name used by the `minotari` CLI.
 pub const DEFAULT_ACCOUNT_NAME: &str = "default";
-
-/// Convert a **block height** to the **birthday day count** expected by
-/// `CipherSeed::change_birthday()`.
-///
-/// The birthday is stored as days since Unix epoch (1970-01-01).
-///
-/// When `block_height` is zero (genesis) this returns 0, which tells the
-/// wallet to scan from the very beginning.
-pub fn block_height_to_birthday(block_height: u64) -> u16 {
-    if block_height == 0 {
-        return 0;
-    }
-    let unix_timestamp = BIRTHDAY_GENESIS_FROM_UNIX_EPOCH + (block_height * AVG_BLOCK_SECS);
-    (unix_timestamp / SECS_PER_DAY) as u16
-}
 
 /// Path to the `seed_words.txt` file inside a wallet data directory.
 pub fn seed_words_path(data_dir: &std::path::Path) -> PathBuf {
     data_dir.join("seed_words.txt")
 }
 
+/// Load existing seed words from disk, or generate and persist a fresh set.
+pub fn load_or_create_seed_words(data_dir: &std::path::Path) -> anyhow::Result<String> {
+    let words_path = seed_words_path(data_dir);
+    match std::fs::read_to_string(&words_path) {
+        Ok(seed_words) => Ok(seed_words.trim().to_string()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            let seed_words = CipherSeed::random()
+                .to_mnemonic(MnemonicLanguage::English, None)?
+                .join(" ")
+                .reveal()
+                .to_string();
+            std::fs::write(&words_path, &seed_words)?;
+            Ok(seed_words)
+        }
+        Err(e) => Err(e.into()),
+    }
+}
+
 /// Re-encode a mnemonic seed phrase with a new birthday value.
 ///
-/// `birthday` must be a day-count value as returned by
-/// [`block_height_to_birthday`] — **not** a raw block height.
+/// `birthday` is a day-count value (days since Unix epoch). Pass 0 for
+/// no date filter (scan from genesis height via `--rescan-from-height`).
 pub fn seed_words_with_birthday(seed_words: &str, birthday: u64) -> anyhow::Result<String> {
     let mnemonic = SeedWords::from_str(seed_words).context("failed to parse stored seed words")?;
     let mut seed =
@@ -95,6 +92,22 @@ pub fn derive_wallet_keys(seed_words: &str) -> anyhow::Result<(String, String)> 
     let view_key_hex = view_key_bytes.iter().map(|b| format!("{b:02x}")).collect();
     let spend_key_hex = spend_key_bytes.iter().map(|b| format!("{b:02x}")).collect();
     Ok((view_key_hex, spend_key_hex))
+}
+
+/// Query the base node for the current chain tip height.
+pub async fn get_tip_height(http_client: &Client, base_node_url: &str) -> anyhow::Result<u64> {
+    let url = format!("{}/get_tip_info", base_node_url.trim_end_matches('/'));
+    let tip: TipInfoResponse = http_client
+        .get(url)
+        .send()
+        .await
+        .context("failed to query get_tip_info")?
+        .error_for_status()
+        .context("base node returned an HTTP error on get_tip_info")?
+        .json()
+        .await
+        .context("failed to parse get_tip_info response")?;
+    Ok(tip.metadata.best_block_height)
 }
 
 /// Response from the base-node `/get_tip_info` HTTP endpoint.

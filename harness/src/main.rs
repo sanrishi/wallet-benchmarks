@@ -33,7 +33,7 @@ async fn run_old_wallet_scenarios(
 ) -> Vec<ScenarioResult> {
     let mut scenarios = Vec::new();
 
-    let _ = restart_old_wallet_for_scan(old_wallet, 0).await;
+    let _ = restart_old_wallet_for_scan(old_wallet).await;
     print_old_wallet_address(old_wallet).await;
     let guard = OldWalletGuard { driver: old_wallet };
 
@@ -53,13 +53,13 @@ async fn run_old_wallet_scenarios(
     });
     let post_s1_balance = guard.driver.get_balance().await.unwrap_or(0);
 
-    let _ = restart_old_wallet_for_scan(guard.driver, 0).await;
+    let _ = restart_old_wallet_for_scan(guard.driver).await;
     scenarios.push(match run_s2(&*guard.driver, post_s1_balance).await {
         Ok(s) => s,
         Err(e) => scenario_error_result("S2", e.to_string()),
     });
 
-    let _ = restart_old_wallet_for_scan(guard.driver, h_birth).await;
+    let _ = restart_old_wallet_for_scan(guard.driver).await;
     scenarios.push(
         match run_s3(&*guard.driver, h_birth, post_s1_balance).await {
             Ok(s) => s,
@@ -77,13 +77,13 @@ async fn run_old_wallet_scenarios(
     });
     let post_s5_balance = guard.driver.get_balance().await.unwrap_or(0);
 
-    let _ = restart_old_wallet_for_scan(guard.driver, 0).await;
+    let _ = restart_old_wallet_for_scan(guard.driver).await;
     scenarios.push(match run_s6(&*guard.driver, post_s5_balance).await {
         Ok(s) => s,
         Err(e) => scenario_error_result("S6", e.to_string()),
     });
 
-    let _ = restart_old_wallet_for_scan(guard.driver, h_birth).await;
+    let _ = restart_old_wallet_for_scan(guard.driver).await;
     scenarios.push(
         match run_s7(&*guard.driver, h_birth, post_s5_balance).await {
             Ok(s) => s,
@@ -96,11 +96,10 @@ async fn run_old_wallet_scenarios(
 
 async fn restart_old_wallet_for_scan(
     old_wallet: &mut OldWalletDriver,
-    birthday: u64,
 ) -> anyhow::Result<()> {
     old_wallet.stop();
     old_wallet.reset().await?;
-    old_wallet.set_seed_birthday(birthday)?;
+    old_wallet.set_seed_birthday()?;
     old_wallet.start().await
 }
 

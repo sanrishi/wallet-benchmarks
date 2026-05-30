@@ -1,2 +1,5 @@
 /target
 Cargo.lock
+wallet-data/
+wallet-data-new/
+wallet-data-pp/

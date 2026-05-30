@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 use std::fs;
-use std::io;
 use std::net::TcpListener;
 use std::path::PathBuf;
 use std::process::Stdio;
@@ -14,7 +13,7 @@ use serde::Deserialize;
 use tari_common::configuration::Network;
 use tari_common_types::seeds::{
     cipher_seed::CipherSeed,
-    mnemonic::{Mnemonic, MnemonicLanguage},
+    mnemonic::Mnemonic,
     seed_words::SeedWords,
 };
 use tari_common_types::tari_address::{TariAddress, TariAddressFeatures};
@@ -35,7 +34,7 @@ use tokio::process::Command;
 use crate::driver::WalletDriver;
 use crate::drivers::shared;
 use crate::drivers::shared::{
-    block_height_to_birthday, parse_balance_output, seed_words_path, seed_words_with_birthday,
+    parse_balance_output, seed_words_with_birthday,
     DEFAULT_ACCOUNT_NAME,
 };
 use crate::metrics::{ScanMetrics, TxMetrics};
@@ -101,35 +100,16 @@ impl NewWalletDriver {
     }
 
     fn load_or_create_seed_words(data_dir: &std::path::Path) -> anyhow::Result<String> {
-        let words_path = seed_words_path(data_dir);
+        let words_path = shared::seed_words_path(data_dir);
         let database_path = data_dir.join("wallet.db");
-
-        match fs::read_to_string(&words_path) {
-            Ok(seed_words) => return Ok(seed_words.trim().to_string()),
-            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
-            Err(error) => {
-                return Err(error)
-                    .with_context(|| format!("failed to read {}", words_path.display()));
-            }
-        }
-
-        if database_path.exists() {
+        if !words_path.exists() && database_path.exists() {
             return Err(anyhow!(
                 "existing wallet database found at {} but {} is missing; wipe the data dir or restore the seed file",
                 database_path.display(),
                 words_path.display()
             ));
         }
-
-        let seed_words = CipherSeed::random()
-            .to_mnemonic(MnemonicLanguage::English, None)
-            .context("failed to generate mnemonic seed words for new_wallet")?
-            .join(" ")
-            .reveal()
-            .to_string();
-        fs::write(&words_path, &seed_words)
-            .with_context(|| format!("failed to write {}", words_path.display()))?;
-        Ok(seed_words)
+        shared::load_or_create_seed_words(data_dir)
     }
 
     fn seed_words_with_birthday_for_driver(&self, birthday: u64) -> anyhow::Result<String> {
@@ -726,20 +706,7 @@ impl WalletDriver for NewWalletDriver {
     }
 
     async fn get_tip_height(&self) -> anyhow::Result<u64> {
-        let url = format!("{}/get_tip_info", self.base_node_url.trim_end_matches('/'));
-        let tip: shared::TipInfoResponse = self
-            .http_client
-            .get(url)
-            .send()
-            .await
-            .context("failed to query get_tip_info")?
-            .error_for_status()
-            .context("base node returned an HTTP error on get_tip_info")?
-            .json()
-            .await
-            .context("failed to parse get_tip_info response")?;
-
-        Ok(tip.metadata.best_block_height)
+        shared::get_tip_height(&self.http_client, &self.base_node_url).await
     }
 
     async fn get_self_address(&self) -> anyhow::Result<String> {
@@ -752,10 +719,7 @@ impl WalletDriver for NewWalletDriver {
     }
 
     async fn scan_from_birthday(&self, height: u64) -> anyhow::Result<ScanMetrics> {
-        // Convert the block height into a birthday day-count for the CipherSeed,
-        // then pass the block height as the rescan-from-height CLI argument.
-        let birthday_days = block_height_to_birthday(height) as u64;
-        self.scan_from_height(height, birthday_days).await
+        self.scan_from_height(height, 0).await
     }
 
     async fn send_single(
