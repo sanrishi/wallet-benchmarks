@@ -32,6 +32,8 @@ pub struct ScenarioResult {
     pub scan_metrics: Option<ScanMetrics>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub recorded_birth_height: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
 
 #[derive(Debug, serde::Serialize)]

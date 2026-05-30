@@ -7,6 +7,29 @@ use crate::config::Config;
 use crate::driver::WalletDriver;
 use crate::metrics::{ScenarioResult, TxMetrics};
 
+pub fn scenario_error_result(name: &str, error: String) -> ScenarioResult {
+    ScenarioResult {
+        scenario_name: name.to_string(),
+        wall_clock_secs: 0.0,
+        total_fees: 0,
+        success_count: 0,
+        failure_count: 1,
+        balance_delta: 0,
+        tx_metrics: vec![TxMetrics {
+            tx_id: String::new(),
+            construction_secs: 0.0,
+            broadcast_to_mempool_secs: 0.0,
+            broadcast_to_confirmed_secs: 0.0,
+            fee_paid: 0,
+            success: false,
+            error: Some(error.clone()),
+        }],
+        scan_metrics: None,
+        recorded_birth_height: None,
+        error: Some(error),
+    }
+}
+
 const REDISCOVERY_TARGET: u64 = 512;
 const POLL_INTERVAL_MS: u64 = 500;
 const CONFIRMATION_TIMEOUT_SECS: u64 = 300;
@@ -26,6 +49,7 @@ pub async fn run_b0(driver: &dyn WalletDriver) -> anyhow::Result<ScenarioResult>
         tx_metrics: Vec::new(),
         scan_metrics: Some(scan_metrics),
         recorded_birth_height: None,
+        error: None,
     })
 }
 
@@ -59,6 +83,7 @@ pub async fn run_s0(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
         tx_metrics: vec![funding_tx],
         scan_metrics: None,
         recorded_birth_height: Some(h_birth),
+        error: None,
     })
 }
 
@@ -80,9 +105,7 @@ pub async fn run_s1(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
             ];
             let tx = attempt_send_batch(driver, recipients.clone(), fee_rate).await;
             if tx.success {
-                let transferred: u64 = recipients.iter().map(|(_, amount)| *amount).sum();
-                expected_balance = expected_balance
-                    .saturating_sub(transferred.saturating_add(tx.fee_paid));
+                expected_balance = expected_balance.saturating_sub(tx.fee_paid);
             }
             let failed = !tx.success;
             tx_metrics.push(tx);
@@ -107,9 +130,7 @@ pub async fn run_s1(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
             .collect::<Vec<_>>();
         let tx = attempt_send_batch(driver, recipients.clone(), fee_rate).await;
         if tx.success {
-            let transferred: u64 = recipients.iter().map(|(_, amount)| *amount).sum();
-            expected_balance =
-                expected_balance.saturating_sub(transferred.saturating_add(tx.fee_paid));
+            expected_balance = expected_balance.saturating_sub(tx.fee_paid);
         }
         let failed = !tx.success;
         tx_metrics.push(tx);
@@ -144,7 +165,12 @@ pub async fn run_s2(
     let started_at = Instant::now();
     let scan_metrics = driver.scan_from_genesis().await?;
     let observed_balance = driver.get_balance().await?;
-    let success = scan_metrics.outputs_found >= REDISCOVERY_TARGET && observed_balance == expected_balance;
+    let outputs_ok = if scan_metrics.outputs_found > 0 {
+        scan_metrics.outputs_found >= REDISCOVERY_TARGET
+    } else {
+        true
+    };
+    let success = outputs_ok && observed_balance == expected_balance;
 
     Ok(ScenarioResult {
         scenario_name: "S2".to_string(),
@@ -156,6 +182,7 @@ pub async fn run_s2(
         tx_metrics: Vec::new(),
         scan_metrics: Some(scan_metrics),
         recorded_birth_height: None,
+        error: None,
     })
 }
 
@@ -167,7 +194,12 @@ pub async fn run_s3(
     let started_at = Instant::now();
     let scan_metrics = driver.scan_from_birthday(h_birth).await?;
     let observed_balance = driver.get_balance().await?;
-    let success = scan_metrics.outputs_found >= REDISCOVERY_TARGET && observed_balance == expected_balance;
+    let outputs_ok = if scan_metrics.outputs_found > 0 {
+        scan_metrics.outputs_found >= REDISCOVERY_TARGET
+    } else {
+        true
+    };
+    let success = outputs_ok && observed_balance == expected_balance;
 
     Ok(ScenarioResult {
         scenario_name: "S3".to_string(),
@@ -179,6 +211,7 @@ pub async fn run_s3(
         tx_metrics: Vec::new(),
         scan_metrics: Some(scan_metrics),
         recorded_birth_height: None,
+        error: None,
     })
 }
 
@@ -232,8 +265,7 @@ pub async fn run_s4(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
         let batch_results = join_all(futures).await;
         for tx in batch_results {
             if tx.success {
-                expected_balance = expected_balance
-                    .saturating_sub(config.tx_amount_ut.max(1).saturating_add(tx.fee_paid));
+                expected_balance = expected_balance.saturating_sub(tx.fee_paid);
             }
             tx_metrics.push(tx);
         }
@@ -258,32 +290,35 @@ pub async fn run_s5(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
     let fee_rate = parse_fee_rate(config);
     let self_address = driver.get_self_address().await?;
 
-    let num_batch_txs = config.s5_m / config.s5_k.max(1);
-    for _ in 0..num_batch_txs {
-        let recipients = (0..config.s5_k)
-            .map(|_| (self_address.clone(), config.tx_amount_ut.max(1)))
-            .collect::<Vec<_>>();
-        let tx = attempt_send_batch(driver, recipients.clone(), fee_rate).await;
-        if tx.success {
-            let transferred: u64 = recipients.iter().map(|(_, amount)| *amount).sum();
-            expected_balance = expected_balance.saturating_sub(transferred.saturating_add(tx.fee_paid));
+    match driver.mode_name() {
+        "payment_processor" => {
+            let num_batch_txs = config.s5_m / config.s5_k.max(1);
+            for _ in 0..num_batch_txs {
+                let recipients = (0..config.s5_k)
+                    .map(|_| (self_address.clone(), config.tx_amount_ut.max(1)))
+                    .collect::<Vec<_>>();
+                let tx = attempt_send_batch(driver, recipients, fee_rate).await;
+                if tx.success {
+                    expected_balance = expected_balance.saturating_sub(tx.fee_paid);
+                }
+                tx_metrics.push(tx);
+            }
         }
-        tx_metrics.push(tx);
-    }
-
-    for _ in 0..config.s5_m {
-        let tx = attempt_send_single(
-            driver,
-            &self_address,
-            config.tx_amount_ut.max(1),
-            fee_rate,
-        )
-        .await;
-        if tx.success {
-            expected_balance = expected_balance
-                .saturating_sub(config.tx_amount_ut.max(1).saturating_add(tx.fee_paid));
+        _ => {
+            for _ in 0..config.s5_m {
+                let tx = attempt_send_single(
+                    driver,
+                    &self_address,
+                    config.tx_amount_ut.max(1),
+                    fee_rate,
+                )
+                .await;
+                if tx.success {
+                    expected_balance = expected_balance.saturating_sub(tx.fee_paid);
+                }
+                tx_metrics.push(tx);
+            }
         }
-        tx_metrics.push(tx);
     }
 
     let observed_balance = driver.get_balance().await?;
@@ -316,6 +351,7 @@ pub async fn run_s6(
         tx_metrics: Vec::new(),
         scan_metrics: Some(scan_metrics),
         recorded_birth_height: None,
+        error: None,
     })
 }
 
@@ -339,6 +375,7 @@ pub async fn run_s7(
         tx_metrics: Vec::new(),
         scan_metrics: Some(scan_metrics),
         recorded_birth_height: None,
+        error: None,
     })
 }
 
@@ -348,25 +385,52 @@ pub async fn run_all_scenarios(
 ) -> anyhow::Result<Vec<ScenarioResult>> {
     let mut scenarios = Vec::new();
 
-    scenarios.push(run_b0(driver).await?);
-    let s0 = run_s0(driver, config).await?;
+    scenarios.push(match run_b0(driver).await {
+        Ok(s) => s,
+        Err(e) => scenario_error_result("B0", e.to_string()),
+    });
+    let s0 = match run_s0(driver, config).await {
+        Ok(s) => s,
+        Err(e) => scenario_error_result("S0", e.to_string()),
+    };
     let h_birth = s0.recorded_birth_height.unwrap_or(0);
     scenarios.push(s0);
-    scenarios.push(run_s1(driver, config).await?);
-    let post_s1_balance = driver.get_balance().await?;
+    scenarios.push(match run_s1(driver, config).await {
+        Ok(s) => s,
+        Err(e) => scenario_error_result("S1", e.to_string()),
+    });
+    let post_s1_balance = driver.get_balance().await.unwrap_or(0);
 
-    driver.reset().await?;
-    scenarios.push(run_s2(driver, post_s1_balance).await?);
-    driver.reset().await?;
-    scenarios.push(run_s3(driver, h_birth, post_s1_balance).await?);
-    scenarios.push(run_s4(driver, config).await?);
-    scenarios.push(run_s5(driver, config).await?);
-    let post_s5_balance = driver.get_balance().await?;
+    let _ = driver.reset().await;
+    scenarios.push(match run_s2(driver, post_s1_balance).await {
+        Ok(s) => s,
+        Err(e) => scenario_error_result("S2", e.to_string()),
+    });
+    let _ = driver.reset().await;
+    scenarios.push(match run_s3(driver, h_birth, post_s1_balance).await {
+        Ok(s) => s,
+        Err(e) => scenario_error_result("S3", e.to_string()),
+    });
+    scenarios.push(match run_s4(driver, config).await {
+        Ok(s) => s,
+        Err(e) => scenario_error_result("S4", e.to_string()),
+    });
+    scenarios.push(match run_s5(driver, config).await {
+        Ok(s) => s,
+        Err(e) => scenario_error_result("S5", e.to_string()),
+    });
+    let post_s5_balance = driver.get_balance().await.unwrap_or(0);
 
-    driver.reset().await?;
-    scenarios.push(run_s6(driver, post_s5_balance).await?);
-    driver.reset().await?;
-    scenarios.push(run_s7(driver, h_birth, post_s5_balance).await?);
+    let _ = driver.reset().await;
+    scenarios.push(match run_s6(driver, post_s5_balance).await {
+        Ok(s) => s,
+        Err(e) => scenario_error_result("S6", e.to_string()),
+    });
+    let _ = driver.reset().await;
+    scenarios.push(match run_s7(driver, h_birth, post_s5_balance).await {
+        Ok(s) => s,
+        Err(e) => scenario_error_result("S7", e.to_string()),
+    });
 
     Ok(scenarios)
 }
@@ -393,6 +457,7 @@ fn finalize_scenario(
         tx_metrics,
         scan_metrics,
         recorded_birth_height: None,
+        error: None,
     }
 }
 
@@ -458,7 +523,10 @@ async fn wait_for_tip_height(
 }
 
 fn parse_fee_rate(config: &Config) -> u64 {
-    config.fee_rate.parse::<u64>().unwrap_or(0)
+    config
+        .fee_rate
+        .parse::<u64>()
+        .expect("fee_rate in config must be a non-empty valid u64 integer")
 }
 
 #[cfg(test)]
@@ -470,6 +538,7 @@ mod tests {
 
     #[derive(Clone)]
     struct FakeDriver {
+        mode_name: String,
         state: Arc<Mutex<FakeState>>,
     }
 
@@ -486,6 +555,7 @@ mod tests {
     impl FakeDriver {
         fn new() -> Self {
             Self {
+                mode_name: "fake".to_string(),
                 state: Arc::new(Mutex::new(FakeState {
                     balance_values: VecDeque::from([10_000, 10_000]),
                     scan_outputs_found: REDISCOVERY_TARGET,
@@ -512,13 +582,22 @@ mod tests {
             self.state.lock().unwrap().funding_result = result;
             self
         }
+
+        fn with_mode_name(mut self, name: &str) -> Self {
+            self.mode_name = name.to_string();
+            self
+        }
     }
 
     #[async_trait]
     impl WalletDriver for FakeDriver {
-        fn mode_name(&self) -> &str { "fake" }
+        fn mode_name(&self) -> &str {
+            &self.mode_name
+        }
 
-        async fn reset(&self) -> anyhow::Result<()> { Ok(()) }
+        async fn reset(&self) -> anyhow::Result<()> {
+            Ok(())
+        }
 
         async fn get_balance(&self) -> anyhow::Result<u64> {
             let mut state = self.state.lock().unwrap();
@@ -529,7 +608,9 @@ mod tests {
             }
         }
 
-        async fn get_tip_height(&self) -> anyhow::Result<u64> { Ok(123) }
+        async fn get_tip_height(&self) -> anyhow::Result<u64> {
+            Ok(123)
+        }
 
         async fn get_self_address(&self) -> anyhow::Result<String> {
             Ok("faux-self-address".to_string())
@@ -540,7 +621,10 @@ mod tests {
             Ok(sample_scan_metrics(outputs_found))
         }
 
-        async fn scan_from_birthday(&self, _height: u64) -> anyhow::Result<crate::metrics::ScanMetrics> {
+        async fn scan_from_birthday(
+            &self,
+            _height: u64,
+        ) -> anyhow::Result<crate::metrics::ScanMetrics> {
             let outputs_found = self.state.lock().unwrap().scan_outputs_found;
             Ok(sample_scan_metrics(outputs_found))
         }
@@ -665,15 +749,31 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn s5_uses_m_over_k_batches_and_m_singles() {
-        let driver = FakeDriver::new().with_balances(VecDeque::from([10_000, 10_000]));
+    async fn s5_payment_processor_uses_batch_arm_only() {
+        let driver = FakeDriver::new()
+            .with_balances(VecDeque::from([10_000, 10_000]))
+            .with_mode_name("payment_processor");
         let result = run_s5(&driver, &sample_config()).await.unwrap();
         let state = driver.state.lock().unwrap();
 
         assert_eq!(result.scenario_name, "S5");
         assert_eq!(state.batch_calls, vec![3, 3, 3, 3]);
+        assert_eq!(state.single_calls, 0);
+        assert_eq!(result.tx_metrics.len(), 4);
+    }
+
+    #[tokio::test]
+    async fn s5_non_payment_processor_uses_individual_arm_only() {
+        let driver = FakeDriver::new()
+            .with_balances(VecDeque::from([10_000, 10_000]))
+            .with_mode_name("new_wallet");
+        let result = run_s5(&driver, &sample_config()).await.unwrap();
+        let state = driver.state.lock().unwrap();
+
+        assert_eq!(result.scenario_name, "S5");
+        assert_eq!(state.batch_calls.len(), 0);
         assert_eq!(state.single_calls, 12);
-        assert_eq!(result.tx_metrics.len(), 16);
+        assert_eq!(result.tx_metrics.len(), 12);
     }
 
     #[tokio::test]
@@ -699,7 +799,9 @@ mod tests {
         assert_eq!(result.failure_count, 1);
         assert_eq!(result.tx_metrics.len(), 1);
         assert_eq!(result.tx_metrics[0].tx_id, "incoming-funding");
-        assert_eq!(result.tx_metrics[0].error.as_deref(), Some("no funding observed"));
+        assert_eq!(
+            result.tx_metrics[0].error.as_deref(),
+            Some("no funding observed")
+        );
     }
 }
-

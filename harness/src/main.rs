@@ -14,7 +14,7 @@ use drivers::new_wallet::NewWalletDriver;
 use drivers::old_wallet::OldWalletDriver;
 use drivers::payment_processor::PaymentProcessorDriver;
 use metrics::{BenchmarkReport, ScenarioResult};
-use scenarios::{run_all_scenarios, run_b0, run_s0, run_s1, run_s2, run_s3, run_s4, run_s5, run_s6, run_s7};
+use scenarios::*;
 use sysinfo::System;
 
 struct OldWalletGuard<'a> {
@@ -30,38 +30,74 @@ impl Drop for OldWalletGuard<'_> {
 async fn run_old_wallet_scenarios(
     old_wallet: &mut OldWalletDriver,
     config: &Config,
-) -> anyhow::Result<Vec<ScenarioResult>> {
-    restart_old_wallet_for_scan(old_wallet, 0).await?;
+) -> Vec<ScenarioResult> {
+    let mut scenarios = Vec::new();
+
+    let _ = restart_old_wallet_for_scan(old_wallet, 0).await;
     print_old_wallet_address(old_wallet).await;
     let guard = OldWalletGuard { driver: old_wallet };
-    let mut scenarios = Vec::new();
-    scenarios.push(run_b0(&*guard.driver).await?);
-    let s0 = run_s0(&*guard.driver, config).await?;
+
+    scenarios.push(match run_b0(&*guard.driver).await {
+        Ok(s) => s,
+        Err(e) => scenario_error_result("B0", e.to_string()),
+    });
+    let s0 = match run_s0(&*guard.driver, config).await {
+        Ok(s) => s,
+        Err(e) => scenario_error_result("S0", e.to_string()),
+    };
     let h_birth = s0.recorded_birth_height.unwrap_or(0);
     scenarios.push(s0);
-    scenarios.push(run_s1(&*guard.driver, config).await?);
-    let post_s1_balance = guard.driver.get_balance().await?;
+    scenarios.push(match run_s1(&*guard.driver, config).await {
+        Ok(s) => s,
+        Err(e) => scenario_error_result("S1", e.to_string()),
+    });
+    let post_s1_balance = guard.driver.get_balance().await.unwrap_or(0);
 
-    restart_old_wallet_for_scan(guard.driver, 0).await?;
-    scenarios.push(run_s2(&*guard.driver, post_s1_balance).await?);
+    let _ = restart_old_wallet_for_scan(guard.driver, 0).await;
+    scenarios.push(match run_s2(&*guard.driver, post_s1_balance).await {
+        Ok(s) => s,
+        Err(e) => scenario_error_result("S2", e.to_string()),
+    });
 
-    restart_old_wallet_for_scan(guard.driver, h_birth).await?;
-    scenarios.push(run_s3(&*guard.driver, h_birth, post_s1_balance).await?);
+    let _ = restart_old_wallet_for_scan(guard.driver, h_birth).await;
+    scenarios.push(
+        match run_s3(&*guard.driver, h_birth, post_s1_balance).await {
+            Ok(s) => s,
+            Err(e) => scenario_error_result("S3", e.to_string()),
+        },
+    );
 
-    scenarios.push(run_s4(&*guard.driver, config).await?);
-    scenarios.push(run_s5(&*guard.driver, config).await?);
-    let post_s5_balance = guard.driver.get_balance().await?;
+    scenarios.push(match run_s4(&*guard.driver, config).await {
+        Ok(s) => s,
+        Err(e) => scenario_error_result("S4", e.to_string()),
+    });
+    scenarios.push(match run_s5(&*guard.driver, config).await {
+        Ok(s) => s,
+        Err(e) => scenario_error_result("S5", e.to_string()),
+    });
+    let post_s5_balance = guard.driver.get_balance().await.unwrap_or(0);
 
-    restart_old_wallet_for_scan(guard.driver, 0).await?;
-    scenarios.push(run_s6(&*guard.driver, post_s5_balance).await?);
+    let _ = restart_old_wallet_for_scan(guard.driver, 0).await;
+    scenarios.push(match run_s6(&*guard.driver, post_s5_balance).await {
+        Ok(s) => s,
+        Err(e) => scenario_error_result("S6", e.to_string()),
+    });
 
-    restart_old_wallet_for_scan(guard.driver, h_birth).await?;
-    scenarios.push(run_s7(&*guard.driver, h_birth, post_s5_balance).await?);
+    let _ = restart_old_wallet_for_scan(guard.driver, h_birth).await;
+    scenarios.push(
+        match run_s7(&*guard.driver, h_birth, post_s5_balance).await {
+            Ok(s) => s,
+            Err(e) => scenario_error_result("S7", e.to_string()),
+        },
+    );
 
-    Ok(scenarios)
+    scenarios
 }
 
-async fn restart_old_wallet_for_scan(old_wallet: &mut OldWalletDriver, birthday: u64) -> anyhow::Result<()> {
+async fn restart_old_wallet_for_scan(
+    old_wallet: &mut OldWalletDriver,
+    birthday: u64,
+) -> anyhow::Result<()> {
     old_wallet.stop();
     old_wallet.reset().await?;
     old_wallet.set_seed_birthday(birthday)?;
@@ -135,7 +171,9 @@ fn scan_duration(scenarios: &[ScenarioResult], name: &str) -> Option<f64> {
 fn tx_duration_sum(metrics: &[metrics::TxMetrics]) -> f64 {
     metrics
         .iter()
-        .map(|tx| tx.construction_secs + tx.broadcast_to_mempool_secs + tx.broadcast_to_confirmed_secs)
+        .map(|tx| {
+            tx.construction_secs + tx.broadcast_to_mempool_secs + tx.broadcast_to_confirmed_secs
+        })
         .sum()
 }
 
@@ -149,23 +187,28 @@ fn build_report(
     scenarios: Vec<ScenarioResult>,
     config: &Config,
 ) -> BenchmarkReport {
-    let scan_delta_s2_minus_b0 =
-        match (scan_duration(&scenarios, "B0"), scan_duration(&scenarios, "S2")) {
-            (Some(b0), Some(s2)) => Some(s2 - b0),
-            _ => None,
-        };
-    let scan_delta_s6_minus_s2 =
-        match (scan_duration(&scenarios, "S2"), scan_duration(&scenarios, "S6")) {
-            (Some(s2), Some(s6)) => Some(s6 - s2),
-            _ => None,
-        };
+    let scan_delta_s2_minus_b0 = match (
+        scan_duration(&scenarios, "B0"),
+        scan_duration(&scenarios, "S2"),
+    ) {
+        (Some(b0), Some(s2)) => Some(s2 - b0),
+        _ => None,
+    };
+    let scan_delta_s6_minus_s2 = match (
+        scan_duration(&scenarios, "S2"),
+        scan_duration(&scenarios, "S6"),
+    ) {
+        (Some(s2), Some(s6)) => Some(s6 - s2),
+        _ => None,
+    };
     let s5_throughput_multiplier = scenarios
         .iter()
         .find(|scenario| scenario.scenario_name == "S5")
         .and_then(|scenario| {
             let num_batch_txs = (config.s5_m / config.s5_k.max(1)) as usize;
             let num_individual_txs = config.s5_m as usize;
-            if scenario.tx_metrics.len() < num_batch_txs + num_individual_txs || num_batch_txs == 0 {
+            if scenario.tx_metrics.len() < num_batch_txs + num_individual_txs || num_batch_txs == 0
+            {
                 return None;
             }
             let batch_duration = tx_duration_sum(&scenario.tx_metrics[..num_batch_txs]);
@@ -242,13 +285,7 @@ async fn main() -> anyhow::Result<()> {
         config.base_node_http_url.clone(),
         config.c_min,
     )?;
-    let old_wallet_scenarios = match run_old_wallet_scenarios(&mut old_wallet, &config).await {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!("old_wallet failed: {e}");
-            vec![]
-        }
-    };
+    let old_wallet_scenarios = run_old_wallet_scenarios(&mut old_wallet, &config).await;
     reports.push(build_report(
         cpu_model.clone(),
         ram_kb,
@@ -275,14 +312,14 @@ async fn main() -> anyhow::Result<()> {
                 Err(error) => {
                     eprintln!("new_wallet failed: {error}");
                     vec![]
-                },
+                }
             };
             (mode_name, scenarios)
-        },
+        }
         Err(error) => {
             eprintln!("new_wallet initialization failed: {error}");
             ("new_wallet".to_string(), vec![])
-        },
+        }
     };
     reports.push(build_report(
         cpu_model.clone(),
@@ -313,14 +350,14 @@ async fn main() -> anyhow::Result<()> {
                 Err(error) => {
                     eprintln!("payment_processor failed: {error}");
                     vec![]
-                },
+                }
             };
             (mode_name, scenarios)
-        },
+        }
         Err(error) => {
             eprintln!("payment_processor initialization failed: {error}");
             ("payment_processor".to_string(), vec![])
-        },
+        }
     };
     reports.push(build_report(
         cpu_model,

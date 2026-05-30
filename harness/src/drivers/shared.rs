@@ -1,8 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::str::FromStr;
 
 use anyhow::Context;
-use rusqlite::Connection;
 use serde::Deserialize;
 use tari_common_types::seeds::{
     cipher_seed::CipherSeed,
@@ -46,12 +45,10 @@ pub fn seed_words_path(data_dir: &std::path::Path) -> PathBuf {
 /// `birthday` must be a day-count value as returned by
 /// [`block_height_to_birthday`] — **not** a raw block height.
 pub fn seed_words_with_birthday(seed_words: &str, birthday: u64) -> anyhow::Result<String> {
-    let mnemonic =
-        SeedWords::from_str(seed_words).context("failed to parse stored seed words")?;
-    let mut seed = CipherSeed::from_mnemonic(&mnemonic, None)
-        .context("failed to reconstruct cipher seed")?;
-    let birthday =
-        u16::try_from(birthday).context("birthday value exceeds u16 range")?;
+    let mnemonic = SeedWords::from_str(seed_words).context("failed to parse stored seed words")?;
+    let mut seed =
+        CipherSeed::from_mnemonic(&mnemonic, None).context("failed to reconstruct cipher seed")?;
+    let birthday = u16::try_from(birthday).context("birthday value exceeds u16 range")?;
     seed.change_birthday(birthday);
     seed.to_mnemonic(MnemonicLanguage::English, None)
         .map(|m| m.join(" ").reveal().to_string())
@@ -74,28 +71,6 @@ pub fn parse_balance_output(stdout: &str) -> anyhow::Result<u64> {
     let amount = MicroMinotari::from_str(&amount)
         .with_context(|| format!("failed to parse balance amount '{amount}'"))?;
     Ok(amount.as_u64())
-}
-
-/// Count unspent outputs by querying the wallet SQLite database directly.
-///
-/// Queries `SELECT COUNT(*) FROM outputs WHERE deleted_at IS NULL AND status = 'UNSPENT'`
-/// from the given database file. Returns 0 if the table is empty or does not exist.
-pub fn count_unspent_outputs(db_path: &Path) -> anyhow::Result<u64> {
-    let connection = Connection::open(db_path)
-        .with_context(|| format!("failed to open wallet database at {}", db_path.display()))?;
-    let count: i64 = connection
-        .query_row(
-            "SELECT COUNT(*) FROM outputs WHERE deleted_at IS NULL AND status = 'UNSPENT'",
-            [],
-            |row| row.get(0),
-        )
-        .with_context(|| {
-            format!(
-                "failed to query unspent outputs from wallet database at {}",
-                db_path.display()
-            )
-        })?;
-    Ok(count.max(0) as u64)
 }
 
 /// Response from the base-node `/get_tip_info` HTTP endpoint.

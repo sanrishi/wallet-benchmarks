@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
-use async_trait::async_trait;
 use anyhow::Context;
+use async_trait::async_trait;
 
 use crate::driver::WalletDriver;
 use crate::drivers::new_wallet::NewWalletDriver;
@@ -78,7 +78,9 @@ impl WalletDriver for PaymentProcessorDriver {
         amount_ut: u64,
         fee_rate: u64,
     ) -> anyhow::Result<TxMetrics> {
-        self.inner.send_single(to_address, amount_ut, fee_rate).await
+        self.inner
+            .send_single(to_address, amount_ut, fee_rate)
+            .await
     }
 
     async fn send_batch(

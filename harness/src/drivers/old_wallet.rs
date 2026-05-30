@@ -1,11 +1,12 @@
 use std::fs;
-use std::io::ErrorKind;
+use std::io::{BufReader, ErrorKind, Read};
 use std::path::PathBuf;
-use std::process::{Child, Command};
+use std::process::{Child, Command, Stdio};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use async_trait::async_trait;
 use anyhow::anyhow;
+use async_trait::async_trait;
 use reqwest::Client;
 use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
 use tari_common_types::seeds::{
@@ -24,16 +25,17 @@ pub mod tari_rpc {
 }
 
 pub struct OldWalletDriver {
-    pub wallet_bin: PathBuf,      // path to minotari_console_wallet binary
-    pub data_dir: PathBuf,        // wallet data directory (wiped on reset)
+    pub wallet_bin: PathBuf, // path to minotari_console_wallet binary
+    pub data_dir: PathBuf,   // wallet data directory (wiped on reset)
     pub password: String,
-    pub grpc_url: String,         // e.g. "http://127.0.0.1:18143"
+    pub grpc_url: String, // e.g. "http://127.0.0.1:18143"
     pub grpc_port: u16,
     pub base_node_url: String,
     pub confirmation_window: u64,
     http_client: Client,
     seed_words: String,
-    process: Option<Child>,       // spawned wallet process
+    process: Option<Child>,                     // spawned wallet process
+    stderr_capture: Option<Arc<Mutex<String>>>, // captured stderr from child
 }
 
 impl OldWalletDriver {
@@ -59,6 +61,7 @@ impl OldWalletDriver {
             http_client: Client::new(),
             seed_words,
             process: None,
+            stderr_capture: None,
         })
     }
 
@@ -87,7 +90,10 @@ impl OldWalletDriver {
 
     /// Spawn the wallet process and block until gRPC port responds or timeout
     pub async fn start(&mut self) -> anyhow::Result<()> {
-        let child = Command::new(&self.wallet_bin)
+        let stderr_capture = Arc::new(Mutex::new(String::new()));
+        let stderr_capture_clone = stderr_capture.clone();
+
+        let mut child = Command::new(&self.wallet_bin)
             .arg("--grpc-enabled")
             .arg("--grpc-address")
             .arg(format!("/ip4/127.0.0.1/tcp/{}", self.grpc_port))
@@ -97,30 +103,82 @@ impl OldWalletDriver {
             .arg(&self.seed_words)
             .arg(format!("--base-path={}", self.data_dir.display()))
             .arg("--non-interactive-mode")
+            .stderr(Stdio::piped())
             .spawn()?;
-        self.process = Some(child);
+
+        // Read stderr in a background thread so the pipe does not fill up
+        if let Some(stderr_handle) = child.stderr.take() {
+            std::thread::spawn(move || {
+                let mut buffer = String::new();
+                let mut reader = BufReader::new(stderr_handle);
+                let _ = reader.read_to_string(&mut buffer);
+                *stderr_capture_clone.lock().unwrap() = buffer;
+            });
+        }
 
         // Poll gRPC port until ready (max 120s)
         let deadline = Instant::now() + Duration::from_secs(120);
         loop {
             if Instant::now() > deadline {
+                // Process failed to start – include any captured stderr
+                let _ = child.kill();
+                let _ = child.wait();
+                let stderr = stderr_capture.lock().unwrap().clone();
+                if !stderr.is_empty() {
+                    return Err(anyhow!(
+                        "wallet gRPC did not become ready within 120s. stderr:\n{stderr}"
+                    ));
+                }
                 return Err(anyhow!("wallet gRPC did not become ready within 120s"));
             }
-            if tokio::net::TcpStream::connect(
-                format!("127.0.0.1:{}", self.grpc_port)
-            ).await.is_ok() {
+            match child.try_wait() {
+                Ok(Some(status)) => {
+                    // Process exited early – include captured stderr
+                    std::thread::sleep(Duration::from_millis(100));
+                    let stderr = stderr_capture.lock().unwrap().clone();
+                    if !stderr.is_empty() {
+                        return Err(anyhow!(
+                            "wallet process exited early with {status}. stderr:\n{stderr}"
+                        ));
+                    }
+                    return Err(anyhow!("wallet process exited early with {status}"));
+                }
+                Ok(None) => {}
+                Err(e) => return Err(anyhow!("failed to check wallet process status: {e}")),
+            }
+            if tokio::net::TcpStream::connect(format!("127.0.0.1:{}", self.grpc_port))
+                .await
+                .is_ok()
+            {
                 break;
             }
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
+
+        self.process = Some(child);
+        self.stderr_capture = Some(stderr_capture);
         Ok(())
+    }
+
+    /// Return captured stderr output from the child process, if any
+    pub fn captured_stderr(&self) -> String {
+        self.stderr_capture
+            .as_ref()
+            .and_then(|c| c.lock().ok())
+            .map(|guard| guard.clone())
+            .unwrap_or_default()
     }
 
     /// Kill the wallet process
     pub fn stop(&mut self) {
         if let Some(ref mut child) = self.process {
             let _ = child.kill();
+            std::thread::sleep(Duration::from_millis(100));
             let _ = child.wait();
+        }
+        let captured = self.captured_stderr();
+        if !captured.is_empty() {
+            eprintln!("old_wallet stderr:\n{captured}");
         }
         std::thread::sleep(Duration::from_millis(500));
         self.process = None;
@@ -145,22 +203,31 @@ impl OldWalletDriver {
         Err(anyhow!("wallet returned no printable address"))
     }
 
-    fn console_wallet_db_path(&self) -> PathBuf {
-        self.data_dir
-            .join("esmeralda")
-            .join("data")
-            .join("wallet")
-            .join("db")
-            .join("console_wallet.db")
-    }
-
     async fn get_scanned_height(&self) -> anyhow::Result<u64> {
-        use tari_rpc::GetStateRequest;
         use tari_rpc::wallet_client::WalletClient;
+        use tari_rpc::GetStateRequest;
 
         let mut client = WalletClient::connect(self.grpc_url.clone()).await?;
         let resp = client.get_state(GetStateRequest {}).await?.into_inner();
         Ok(resp.scanned_height)
+    }
+
+    async fn get_utxo_count_via_grpc(&self) -> anyhow::Result<u64> {
+        use tari_rpc::wallet_client::WalletClient;
+        use tari_rpc::{CoinBucket, CoinHistogramRequest};
+
+        let mut client = WalletClient::connect(self.grpc_url.clone()).await?;
+        let histogram = client
+            .coin_histogram(CoinHistogramRequest {
+                buckets: vec![CoinBucket {
+                    lower_bound: 0,
+                    upper_bound: u64::MAX,
+                }],
+            })
+            .await?
+            .into_inner();
+        let count: u64 = histogram.buckets.iter().map(|b| b.count).sum();
+        Ok(count)
     }
 
     async fn get_base_node_tip_height(&self) -> anyhow::Result<u64> {
@@ -228,7 +295,7 @@ impl OldWalletDriver {
 
         let wall_clock_secs = started_at.elapsed().as_secs_f64();
         let scanned_blocks = target_tip.saturating_sub(from_height);
-        let outputs_found = shared::count_unspent_outputs(&self.console_wallet_db_path())?;
+        let outputs_found = self.get_utxo_count_via_grpc().await?;
         let blocks_per_sec = if wall_clock_secs > 0.0 {
             scanned_blocks as f64 / wall_clock_secs
         } else {
@@ -264,9 +331,7 @@ impl OldWalletDriver {
 
         loop {
             if Instant::now() > deadline {
-                return Err(anyhow!(
-                    "transaction {tx_id} was not confirmed within 600s"
-                ));
+                return Err(anyhow!("transaction {tx_id} was not confirmed within 600s"));
             }
 
             let mut client = WalletClient::connect(self.grpc_url.clone()).await?;
@@ -377,7 +442,9 @@ impl OldWalletDriver {
 
         Ok(TxMetrics {
             tx_id,
-            construction_secs: construction_finished_at.duration_since(started_at).as_secs_f64(),
+            construction_secs: construction_finished_at
+                .duration_since(started_at)
+                .as_secs_f64(),
             broadcast_to_mempool_secs: broadcast_finished_at
                 .duration_since(construction_finished_at)
                 .as_secs_f64(),
@@ -388,7 +455,10 @@ impl OldWalletDriver {
         })
     }
 
-    async fn latest_incoming_tx_id(&self, expected_amount_ut: u64) -> anyhow::Result<Option<String>> {
+    async fn latest_incoming_tx_id(
+        &self,
+        expected_amount_ut: u64,
+    ) -> anyhow::Result<Option<String>> {
         use tari_rpc::wallet_client::WalletClient;
         use tari_rpc::GetAllCompletedTransactionsRequest;
 
@@ -416,7 +486,9 @@ impl OldWalletDriver {
 
 #[async_trait]
 impl WalletDriver for OldWalletDriver {
-    fn mode_name(&self) -> &str { "old_wallet" }
+    fn mode_name(&self) -> &str {
+        "old_wallet"
+    }
 
     async fn reset(&self) -> anyhow::Result<()> {
         // Caller must call stop() before reset() for old_wallet.
@@ -465,8 +537,8 @@ impl WalletDriver for OldWalletDriver {
     }
 
     async fn get_balance(&self) -> anyhow::Result<u64> {
-        use tari_rpc::GetBalanceRequest;
         use tari_rpc::wallet_client::WalletClient;
+        use tari_rpc::GetBalanceRequest;
 
         let mut client = WalletClient::connect(self.grpc_url.clone()).await?;
         let resp = client
@@ -511,8 +583,8 @@ impl WalletDriver for OldWalletDriver {
     }
 
     async fn observe_funding(&self, expected_amount_ut: u64) -> anyhow::Result<TxMetrics> {
-        use tari_rpc::GetStateRequest;
         use tari_rpc::wallet_client::WalletClient;
+        use tari_rpc::GetStateRequest;
 
         let started_at = Instant::now();
         let deadline = started_at + Duration::from_secs(600);
@@ -527,10 +599,7 @@ impl WalletDriver for OldWalletDriver {
             }
 
             let mut client = WalletClient::connect(self.grpc_url.clone()).await?;
-            let state = client
-                .get_state(GetStateRequest {})
-                .await?
-                .into_inner();
+            let state = client.get_state(GetStateRequest {}).await?.into_inner();
             let balance = state
                 .balance
                 .ok_or_else(|| anyhow!("wallet state returned no balance"))?;
