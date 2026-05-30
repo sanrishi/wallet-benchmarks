@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use std::process::Stdio;
 use std::str::FromStr;
 use std::time::{Duration, Instant};
+use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
 
 use anyhow::{anyhow, Context};
 use reqwest::Client;
@@ -442,24 +443,80 @@ impl NewWalletDriver {
         let h_tip_start = self.get_tip_height().await?;
         let started_at = Instant::now();
 
-        self.run_cli_command(&[
-            "re-scan",
-            "--database-path",
-            database_path,
-            "--password",
-            &self.password,
-            "--base-url",
-            self.base_node_url.as_str(),
-            "--account-name",
-            DEFAULT_ACCOUNT_NAME,
-            "--rescan-from-height",
-            &from_height_string,
-        ])
-        .await?;
+        // Spawn the re-scan CLI process directly so we can track its PID
+        let mut child = Command::new(&self.minotari_bin)
+            .arg("re-scan")
+            .arg("--database-path")
+            .arg(database_path)
+            .arg("--password")
+            .arg(&self.password)
+            .arg("--base-url")
+            .arg(self.base_node_url.as_str())
+            .arg("--account-name")
+            .arg(DEFAULT_ACCOUNT_NAME)
+            .arg("--rescan-from-height")
+            .arg(&from_height_string)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .with_context(|| {
+                format!("failed to spawn re-scan at {}", self.minotari_bin.display())
+            })?;
+
+        let cli_pid = child.id().map(Pid::from_u32);
+        let mut peak_rss_kb = 0_u64;
+        let mut peak_cpu_percent = 0.0_f64;
+        let mut system = System::new_all();
+        let deadline = started_at + Duration::from_secs(1800);
+
+        let cli_output = loop {
+            match child.try_wait() {
+                Ok(Some(_)) => break child.wait_with_output().await?,
+                Ok(None) => {
+                    if Instant::now() > deadline {
+                        let _ = child.kill().await;
+                        let _ = child.wait().await;
+                        return Err(anyhow!("re-scan did not complete within 1800s"));
+                    }
+                    if let Some(pid) = cli_pid {
+                        system.refresh_processes_specifics(
+                            ProcessesToUpdate::Some(&[pid]),
+                            false,
+                            ProcessRefreshKind::nothing().with_memory().with_cpu(),
+                        );
+                        if let Some(process) = system.process(pid) {
+                            peak_rss_kb = peak_rss_kb.max(process.memory());
+                            peak_cpu_percent = peak_cpu_percent.max(process.cpu_usage() as f64);
+                        }
+                    }
+                    tokio::time::sleep(Duration::from_millis(500)).await;
+                }
+                Err(e) => return Err(anyhow!("failed to poll re-scan process: {e}")),
+            }
+        };
+
+        if !cli_output.status.success() {
+            let stderr = String::from_utf8_lossy(&cli_output.stderr);
+            return Err(anyhow!("re-scan failed: {}", stderr.trim()));
+        }
 
         let wall_clock_secs = started_at.elapsed().as_secs_f64();
         let h_tip_end = self.get_tip_height().await?;
         let daemon = self.spawn_daemon(None).await?;
+
+        // Track the daemon process briefly while querying scan status
+        if let Some(daemon_pid) = daemon.pid() {
+            system.refresh_processes_specifics(
+                ProcessesToUpdate::Some(&[daemon_pid]),
+                false,
+                ProcessRefreshKind::nothing().with_memory().with_cpu(),
+            );
+            if let Some(process) = system.process(daemon_pid) {
+                peak_rss_kb = peak_rss_kb.max(process.memory());
+                peak_cpu_percent = peak_cpu_percent.max(process.cpu_usage() as f64);
+            }
+        }
+
         let scan_status = self.get_scan_status(&daemon).await?;
         let outputs_found = if scan_status.outputs_found > 0 {
             scan_status.outputs_found
@@ -481,8 +538,8 @@ impl NewWalletDriver {
             h_tip_start,
             h_tip_end,
             outputs_found,
-            peak_rss_kb: 0,
-            peak_cpu_percent: 0.0,
+            peak_rss_kb,
+            peak_cpu_percent,
         })
     }
 
@@ -763,6 +820,10 @@ pub(super) struct WalletDaemon {
 }
 
 impl WalletDaemon {
+    pub(super) fn pid(&self) -> Option<Pid> {
+        self.child.id().map(Pid::from_u32)
+    }
+
     pub(super) async fn stop(mut self) -> anyhow::Result<()> {
         let _ = self.child.kill().await;
         let _ = self.child.wait().await;
