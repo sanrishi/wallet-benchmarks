@@ -1,10 +1,13 @@
-2026-05-23 20:32:06.056005200 [wallet::console_wallet::main] INFO  Starting Minotari Console Wallet version: 5.3.1-pre.3-9a442c05dd4d1f3ca9936fbd22728d55c4bf4040-release // applications\minotari_console_wallet\src\main.rs:104
-2026-05-23 20:32:06.113203600 [wallet::console_wallet::main] INFO  == Minotari Wallet (5.3.1-pre.3-9a442c05dd4d1f3ca9936fbd22728d55c4bf4040-release) == // applications\minotari_console_wallet\src\lib.rs:122
-2026-05-23 20:32:06.321799600 [wallet] INFO  Transaction sending mechanism is 'DirectAndStoreAndForward' // base_layer\wallet\src\wallet.rs:156
-2026-05-23 20:32:06.323961800 [wallet::base_node_service] INFO  Wallet base node service initializing. // base_layer\wallet\src\base_node_service\mod.rs:72
-2026-05-23 20:32:06.326317500 [wallet::utxo_scanning] INFO  UtxoScanningMode: UTXO scanning service starting // base_layer\wallet\src\utxo_scanner_service\service.rs:122
-2026-05-23 20:32:06.336328800 [wallet::utxo_scanning] INFO  UTXO scanning round started // base_layer\wallet\src\utxo_scanner_service\service.rs:150
-2026-05-23 20:32:06.337038900 [wallet::utxo_scanning] INFO  Starting UTXO scanning task // base_layer\wallet\src\utxo_scanner_service\utxo_scanner_task.rs:242
-2026-05-23 20:32:06.338860400 [wallet::transaction_service::database::wallet] INFO  check_lock_height_status: Found 0 confirmed transactions with lock_height > tip (657285), updating to locked // base_layer\wallet\src\transaction_service\storage\sqlite_db.rs:1576
-2026-05-23 20:32:06.358902600 [wallet::app::main] INFO  Starting grpc server // applications\minotari_console_wallet\src\wallet_modes.rs:364
-2026-05-23 20:32:06.359906500 [wallet::app::main] INFO  Starting GRPC on /ip4/127.0.0.1/tcp/18143 // applications\minotari_console_wallet\src\wallet_modes.rs:412
+2026-05-30 23:06:07.538276700 [wallet::console_wallet::main] INFO  Starting Minotari Console Wallet version: 5.3.1-pre.3-9a442c05dd4d1f3ca9936fbd22728d55c4bf4040-release // applications\minotari_console_wallet\src\main.rs:104
+2026-05-30 23:06:07.562796300 [wallet::console_wallet::main] INFO  == Minotari Wallet (5.3.1-pre.3-9a442c05dd4d1f3ca9936fbd22728d55c4bf4040-release) == // applications\minotari_console_wallet\src\lib.rs:122
+2026-05-30 23:06:08.025412100 [wallet] INFO  Transaction sending mechanism is 'DirectAndStoreAndForward' // base_layer\wallet\src\wallet.rs:156
+2026-05-30 23:06:08.026122200 [wallet::base_node_service] INFO  Wallet base node service initializing. // base_layer\wallet\src\base_node_service\mod.rs:72
+2026-05-30 23:06:08.026746100 [wallet::utxo_scanning] INFO  UtxoScanningMode: UTXO scanning service starting // base_layer\wallet\src\utxo_scanner_service\service.rs:122
+2026-05-30 23:06:08.034233900 [wallet::utxo_scanning] INFO  UTXO scanning round started // base_layer\wallet\src\utxo_scanner_service\service.rs:150
+2026-05-30 23:06:08.034406100 [wallet::utxo_scanning] INFO  Starting UTXO scanning task // base_layer\wallet\src\utxo_scanner_service\utxo_scanner_task.rs:242
+2026-05-30 23:06:08.060002400 [wallet::transaction_service::database::wallet] INFO  check_lock_height_status: Found 0 confirmed transactions with lock_height > tip (0), updating to locked // base_layer\wallet\src\transaction_service\storage\sqlite_db.rs:1576
+2026-05-30 23:06:10.107723900 [wallet::output_manager_service] INFO  UTXO Validation Protocol (Id: 8696707545668885305) completed successfully // base_layer\wallet\src\output_manager_service\service.rs:693
+2026-05-30 23:06:10.107962100 [wallet::transaction_service::service] WARN  Error completing Transaction Validation Protocol (id: 283147019103382547): TransactionValidationInProgress // base_layer\wallet\src\transaction_service\service.rs:3978
+2026-05-30 23:06:13.292261700 [wallet::utxo_scanning] INFO  Fresh wallet recovery/scanning: Wallet birthday '0' at epoch time '1640995200' , scanning from epoch time '1640995200' at block height '0' with header hash '3c3681ad318eb54ca3f3e8aed79d3d207d94a5291aec84ba1a0b628633db3621' // base_layer\wallet\src\utxo_scanner_service\utxo_scanner_task.rs:885
+2026-05-30 23:06:13.292300700 [wallet::utxo_scanning] INFO  UtxoScanningMode: Scanning UTXO's from height = 0 to current tip_height = 672056 (starting header_hash: 3c3681ad318eb54ca3f3e8aed79d3d207d94a5291aec84ba1a0b628633db3621) // base_layer\wallet\src\utxo_scanner_service\utxo_scanner_task.rs:289
+2026-05-30 23:06:13.292330300 [wallet::utxo_scanning] INFO  Starting UTXO scanning from header hash 3c3681ad318eb54ca3f3e8aed79d3d207d94a5291aec84ba1a0b628633db3621 to tip height 672056 // base_layer\wallet\src\utxo_scanner_service\utxo_scanner_task.rs:424

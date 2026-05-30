@@ -97,7 +97,7 @@ git checkout feat/harness-implementation
 
 # Write VPS-optimized config.toml
 cat > config.toml << CONFIG_EOF
-a_fund = 10000000000
+a_fund = 300000000
 c_min = 3
 volume_target = 512
 doubling_rounds = 6
