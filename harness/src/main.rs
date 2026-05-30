@@ -138,7 +138,6 @@ async fn print_all_wallet_addresses(config: &Config) -> anyhow::Result<()> {
             "payment_processor_bin_path",
             &config.payment_processor_bin_path,
         )?,
-        require_nonempty_path("wallet_bin_path", &config.wallet_bin_path)?,
         require_nonempty_path(
             "payment_processor_data_dir",
             &config.payment_processor_data_dir,
@@ -342,7 +341,6 @@ async fn main() -> anyhow::Result<()> {
                 "payment_processor_bin_path",
                 &config.payment_processor_bin_path,
             )?,
-            require_nonempty_path("wallet_bin_path", &config.wallet_bin_path)?,
             require_nonempty_path(
                 "payment_processor_data_dir",
                 &config.payment_processor_data_dir,

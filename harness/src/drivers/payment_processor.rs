@@ -51,7 +51,7 @@ pub struct PaymentProcessorDriver {
     inner: NewWalletDriver,
     pp_bin: PathBuf,
     data_dir: PathBuf,
-    wallet_bin_path: PathBuf,
+    minotari_bin_path: PathBuf,
     password: String,
     base_node_url: String,
     confirmation_window: u64,
@@ -65,7 +65,6 @@ pub struct PaymentProcessorDriver {
 impl PaymentProcessorDriver {
     pub fn new(
         pp_bin: PathBuf,
-        wallet_bin_path: PathBuf,
         data_dir: PathBuf,
         minotari_bin: PathBuf,
         base_node_url: String,
@@ -77,6 +76,7 @@ impl PaymentProcessorDriver {
 
         let seed_words = Self::load_or_create_seed_words(&data_dir)?;
 
+        let minotari_bin_path = minotari_bin.clone();
         let inner = NewWalletDriver::new_with_seed_words(
             minotari_bin,
             data_dir.clone(),
@@ -92,7 +92,7 @@ impl PaymentProcessorDriver {
             inner,
             pp_bin,
             data_dir,
-            wallet_bin_path,
+            minotari_bin_path,
             password,
             base_node_url,
             confirmation_window,
@@ -130,7 +130,7 @@ impl PaymentProcessorDriver {
             .env("TARI_NETWORK", "Esmeralda")
             .env("BASE_NODE", &self.base_node_url)
             .env("PAYMENT_RECEIVER", "http://127.0.0.1:1")
-            .env("CONSOLE_WALLET_PATH", &self.wallet_bin_path)
+            .env("CONSOLE_WALLET_PATH", &self.minotari_bin_path)
             .env("CONSOLE_WALLET_BASE_PATH", &self.data_dir)
             .env("CONSOLE_WALLET_PASSWORD", &self.password)
             .env("LISTEN_PORT", port.to_string())
