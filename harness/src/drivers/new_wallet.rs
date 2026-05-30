@@ -73,6 +73,29 @@ impl NewWalletDriver {
         })
     }
 
+    /// Construct a driver with externally-provided seed words (avoids
+    /// re-creating them from the data directory).
+    pub fn new_with_seed_words(
+        minotari_bin: PathBuf,
+        data_dir: PathBuf,
+        base_node_url: String,
+        confirmation_window: u64,
+        password: String,
+        seed_words: String,
+    ) -> anyhow::Result<Self> {
+        fs::create_dir_all(&data_dir)
+            .with_context(|| format!("failed to create {}", data_dir.display()))?;
+        Ok(Self {
+            minotari_bin,
+            data_dir,
+            base_node_url,
+            confirmation_window,
+            http_client: Client::new(),
+            password,
+            seed_words,
+        })
+    }
+
     fn database_path(&self) -> PathBuf {
         self.data_dir.join("wallet.db")
     }

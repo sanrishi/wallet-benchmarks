@@ -135,11 +135,16 @@ async fn print_all_wallet_addresses(config: &Config) -> anyhow::Result<()> {
     println!("new_wallet: {}", new_wallet.get_self_address().await?);
 
     let payment_processor = PaymentProcessorDriver::new(
-        require_nonempty_path("minotari_bin_path", &config.minotari_bin_path)?,
+        require_nonempty_path(
+            "payment_processor_bin_path",
+            &config.payment_processor_bin_path,
+        )?,
+        require_nonempty_path("wallet_bin_path", &config.wallet_bin_path)?,
         require_nonempty_path(
             "payment_processor_data_dir",
             &config.payment_processor_data_dir,
         )?,
+        require_nonempty_path("minotari_bin_path", &config.minotari_bin_path)?,
         config.base_node_http_url.clone(),
         config.c_min,
         config.payment_processor_password.clone(),
@@ -332,33 +337,45 @@ async fn main() -> anyhow::Result<()> {
         &config,
     ));
 
-    let payment_processor = PaymentProcessorDriver::new(
-        require_nonempty_path("minotari_bin_path", &config.minotari_bin_path)?,
-        require_nonempty_path(
-            "payment_processor_data_dir",
-            &config.payment_processor_data_dir,
-        )?,
-        config.base_node_http_url.clone(),
-        config.c_min,
-        config.payment_processor_password.clone(),
-    );
-    let (payment_processor_mode_name, payment_processor_scenarios) = match payment_processor {
-        Ok(payment_processor) => {
-            let mode_name = payment_processor.mode_name().to_string();
-            let scenarios = match run_all_scenarios(&payment_processor, &config).await {
-                Ok(scenarios) => scenarios,
-                Err(error) => {
-                    eprintln!("payment_processor failed: {error}");
-                    vec![]
+    let (payment_processor_mode_name, payment_processor_scenarios) =
+        match PaymentProcessorDriver::new(
+            require_nonempty_path(
+                "payment_processor_bin_path",
+                &config.payment_processor_bin_path,
+            )?,
+            require_nonempty_path("wallet_bin_path", &config.wallet_bin_path)?,
+            require_nonempty_path(
+                "payment_processor_data_dir",
+                &config.payment_processor_data_dir,
+            )?,
+            require_nonempty_path("minotari_bin_path", &config.minotari_bin_path)?,
+            config.base_node_http_url.clone(),
+            config.c_min,
+            config.payment_processor_password.clone(),
+        ) {
+            Ok(mut pp) => match pp.start_daemon().await {
+                Ok(()) => {
+                    let mode_name = pp.mode_name().to_string();
+                    let scenarios = match run_all_scenarios(&pp, &config).await {
+                        Ok(s) => s,
+                        Err(e) => {
+                            eprintln!("payment_processor scenarios failed: {e}");
+                            vec![]
+                        }
+                    };
+                    let _ = pp.stop_daemon().await;
+                    (mode_name, scenarios)
                 }
-            };
-            (mode_name, scenarios)
-        }
-        Err(error) => {
-            eprintln!("payment_processor initialization failed: {error}");
-            ("payment_processor".to_string(), vec![])
-        }
-    };
+                Err(e) => {
+                    eprintln!("payment_processor daemon start failed: {e}");
+                    (pp.mode_name().to_string(), vec![])
+                }
+            },
+            Err(error) => {
+                eprintln!("payment_processor initialization failed: {error}");
+                ("payment_processor".to_string(), vec![])
+            }
+        };
     reports.push(build_report(
         cpu_model,
         ram_kb,

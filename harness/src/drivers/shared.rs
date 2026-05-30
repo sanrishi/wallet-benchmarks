@@ -8,7 +8,10 @@ use tari_common_types::seeds::{
     mnemonic::{Mnemonic, MnemonicLanguage},
     seed_words::SeedWords,
 };
-use tari_transaction_components::tari_amount::MicroMinotari;
+use tari_transaction_components::{
+    key_manager::wallet_types::{SeedWordsWallet, WalletType},
+    tari_amount::MicroMinotari,
+};
 
 /// Seconds from Unix epoch (1970-01-01) to the Tari network genesis (2022-01-01 00:00:00 UTC).
 pub const BIRTHDAY_GENESIS_FROM_UNIX_EPOCH: u64 = 1_640_995_200;
@@ -71,6 +74,27 @@ pub fn parse_balance_output(stdout: &str) -> anyhow::Result<u64> {
     let amount = MicroMinotari::from_str(&amount)
         .with_context(|| format!("failed to parse balance amount '{amount}'"))?;
     Ok(amount.as_u64())
+}
+
+/// Derive the view key and public spend key hex strings from wallet seed words.
+pub fn derive_wallet_keys(seed_words: &str) -> anyhow::Result<(String, String)> {
+    use tari_utilities::byte_array::ByteArray;
+
+    let mnemonic =
+        SeedWords::from_str(seed_words).context("failed to parse seed words for key derivation")?;
+    let cipher_seed = CipherSeed::from_mnemonic(&mnemonic, None)
+        .context("failed to reconstruct cipher seed for key derivation")?;
+    let wallet = WalletType::SeedWords(
+        SeedWordsWallet::construct_new(cipher_seed)
+            .map_err(|e| anyhow::anyhow!("failed to construct wallet for key derivation: {e}"))?,
+    );
+    let view_key = wallet.get_public_view_key();
+    let spend_key = wallet.get_public_spend_key();
+    let view_key_bytes = view_key.as_bytes();
+    let spend_key_bytes = spend_key.as_bytes();
+    let view_key_hex = view_key_bytes.iter().map(|b| format!("{b:02x}")).collect();
+    let spend_key_hex = spend_key_bytes.iter().map(|b| format!("{b:02x}")).collect();
+    Ok((view_key_hex, spend_key_hex))
 }
 
 /// Response from the base-node `/get_tip_info` HTTP endpoint.

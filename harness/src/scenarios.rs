@@ -720,6 +720,7 @@ mod tests {
             new_wallet_data_dir: String::new(),
             payment_processor_data_dir: String::new(),
             grpc_port: 0,
+            payment_processor_bin_path: String::new(),
         }
     }
 

@@ -20,6 +20,7 @@ pub struct Config {
     pub base_node_version: String,
     pub wallet_bin_path: String,
     pub minotari_bin_path: String,
+    pub payment_processor_bin_path: String,
     pub old_wallet_password: String,
     pub new_wallet_password: String,
     pub payment_processor_password: String,
