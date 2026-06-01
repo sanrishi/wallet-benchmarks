@@ -288,7 +288,7 @@ impl NewWalletDriver {
     ///
     /// Retries with a fresh port if the first attempt fails (TOCTOU
     /// mitigation).
-    async fn spawn_daemon(&self, scan_interval_secs: Option<u64>) -> anyhow::Result<WalletDaemon> {
+    pub(super) async fn spawn_daemon(&self, scan_interval_secs: Option<u64>) -> anyhow::Result<WalletDaemon> {
         self.ensure_wallet_initialized().await?;
 
         for attempt in 0..5 {
@@ -807,6 +807,10 @@ pub(super) struct WalletDaemon {
 }
 
 impl WalletDaemon {
+    pub(super) fn base_url(&self) -> &str {
+        &self.base_url
+    }
+
     pub(super) fn pid(&self) -> Option<Pid> {
         self.child.id().map(Pid::from_u32)
     }
@@ -815,5 +819,11 @@ impl WalletDaemon {
         let _ = self.child.kill().await;
         let _ = self.child.wait().await;
         Ok(())
+    }
+
+    /// Synchronous kill for use in Drop handlers.
+    pub(super) fn kill_sync(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
     }
 }

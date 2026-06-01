@@ -10,7 +10,7 @@ use serde::Deserialize;
 use tokio::process::{Child, Command};
 
 use crate::driver::WalletDriver;
-use crate::drivers::new_wallet::NewWalletDriver;
+use crate::drivers::new_wallet::{NewWalletDriver, WalletDaemon};
 use crate::drivers::shared;
 use crate::drivers::shared::derive_wallet_keys;
 use crate::metrics::{ScanMetrics, TxMetrics};
@@ -43,21 +43,27 @@ struct HealthVersion {
 
 /// Driver for Mode 3 (payment_processor).
 ///
-/// Spawns the actual `minotari_payment_processor` microservice binary as a
-/// long-running daemon and drives it through its REST API for payment
-/// operations.  Wallet-level operations (scan, balance, address) are delegated
-/// to a [`NewWalletDriver`] inner instance (CLI-based).
+/// Spawns TWO parallel daemons:
+/// 1. A `minotari daemon` (new wallet) that provides the PR (Payment Receiver)
+///    REST API for balance queries and fund locking.
+/// 2. The `minotari_payment_processor` microservice that orchestrates payments.
+///
+/// The payment processor connects to the wallet daemon via PAYMENT_RECEIVER
+/// and uses the `minotari_console_wallet` binary (CONSOLE_WALLET_PATH) for
+/// the offline signing step.  Wallet-level operations (scan, balance, address)
+/// are delegated to a [`NewWalletDriver`] inner instance (CLI-based).
 pub struct PaymentProcessorDriver {
     inner: NewWalletDriver,
     pp_bin: PathBuf,
     data_dir: PathBuf,
-    minotari_bin_path: PathBuf,
+    console_wallet_bin_path: PathBuf,
     password: String,
     base_node_url: String,
     confirmation_window: u64,
     http_client: Client,
     seed_words: String,
-    daemon: Option<Child>,
+    pp_daemon: Option<Child>,
+    wallet_daemon: Option<WalletDaemon>,
     api_url: Option<String>,
     api_port: u16,
 }
@@ -67,6 +73,7 @@ impl PaymentProcessorDriver {
         pp_bin: PathBuf,
         data_dir: PathBuf,
         minotari_bin: PathBuf,
+        console_wallet_bin: PathBuf,
         base_node_url: String,
         confirmation_window: u64,
         password: String,
@@ -76,7 +83,6 @@ impl PaymentProcessorDriver {
 
         let seed_words = Self::load_or_create_seed_words(&data_dir)?;
 
-        let minotari_bin_path = minotari_bin.clone();
         let inner = NewWalletDriver::new_with_seed_words(
             minotari_bin,
             data_dir.clone(),
@@ -92,13 +98,14 @@ impl PaymentProcessorDriver {
             inner,
             pp_bin,
             data_dir,
-            minotari_bin_path,
+            console_wallet_bin_path: console_wallet_bin,
             password,
             base_node_url,
             confirmation_window,
             http_client: Client::new(),
             seed_words,
-            daemon: None,
+            pp_daemon: None,
+            wallet_daemon: None,
             api_url: None,
             api_port: pp_port,
         })
@@ -113,24 +120,41 @@ impl PaymentProcessorDriver {
         Ok(listener.local_addr()?.port())
     }
 
-    /// Start the `minotari_payment_processor` daemon with proper env config.
+    /// Start the wallet daemon + payment processor daemon in sequence.
+    ///
+    /// 1. Ensures the wallet database is initialised with the seed words.
+    /// 2. Spawns `minotari daemon` on an ephemeral port (the PR API).
+    /// 3. Spawns `minotari_payment_processor` with PAYMENT_RECEIVER pointing
+    ///    to the wallet daemon's URL and CONSOLE_WALLET_PATH pointing to the
+    ///    minotari_console_wallet binary (used by the transaction_signer
+    ///    worker for offline signing).
     pub async fn start_daemon(&mut self) -> anyhow::Result<()> {
         let port = self.api_port;
         let api_url = format!("http://127.0.0.1:{port}");
         let db_path = self.data_dir.join("payments.db");
         let db_dir = self.data_dir.join("data");
         std::fs::create_dir_all(&db_dir)?;
-
         let db_url = format!("sqlite:{}", db_path.display());
+
+        // 1. Spawn the wallet daemon (PR API) on a free port.
+        let wallet_daemon = self
+            .inner
+            .spawn_daemon(None)
+            .await
+            .context("failed to spawn minotari wallet daemon for payment processor")?;
+        let pr_url = wallet_daemon.base_url().to_string();
+
+        // 2. Derive account keys from seed words (passed as env vars to the PP).
         let (view_key_hex, spend_key_hex) = derive_wallet_keys(&self.seed_words)
             .context("failed to derive payment processor account keys")?;
 
+        // 3. Spawn the payment processor daemon.
         let mut child = Command::new(&self.pp_bin)
             .env("DATABASE_URL", &db_url)
             .env("TARI_NETWORK", "Esmeralda")
             .env("BASE_NODE", &self.base_node_url)
-            .env("PAYMENT_RECEIVER", "http://127.0.0.1:1")
-            .env("CONSOLE_WALLET_PATH", &self.minotari_bin_path)
+            .env("PAYMENT_RECEIVER", &pr_url)
+            .env("CONSOLE_WALLET_PATH", &self.console_wallet_bin_path)
             .env("CONSOLE_WALLET_BASE_PATH", &self.data_dir)
             .env("CONSOLE_WALLET_PASSWORD", &self.password)
             .env("LISTEN_PORT", port.to_string())
@@ -154,6 +178,7 @@ impl PaymentProcessorDriver {
                 )
             })?;
 
+        // 4. Wait for the payment processor API to become reachable.
         let deadline = Instant::now() + Duration::from_secs(60);
         let health_url = format!("{api_url}/health/version");
         loop {
@@ -169,17 +194,25 @@ impl PaymentProcessorDriver {
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
 
-        self.daemon = Some(child);
+        self.wallet_daemon = Some(wallet_daemon);
+        self.pp_daemon = Some(child);
         self.api_url = Some(api_url);
         Ok(())
     }
 
     pub async fn stop_daemon(&mut self) {
-        if let Some(ref mut child) = self.daemon {
+        // Stop the payment processor daemon first.
+        if let Some(ref mut child) = self.pp_daemon {
             let _ = child.kill().await;
             let _ = child.wait().await;
         }
-        self.daemon = None;
+        self.pp_daemon = None;
+
+        // Then stop the wallet daemon.
+        if let Some(daemon) = self.wallet_daemon.take() {
+            let _ = daemon.stop().await;
+        }
+
         self.api_url = None;
     }
 
@@ -220,7 +253,6 @@ impl PaymentProcessorDriver {
             .await
             .context("failed to parse payment processor response")?;
 
-        // Poll for confirmation
         let confirm_deadline = started_at + Duration::from_secs(600);
         let tx_id = payment.payment_id.clone();
         let mut broadcast_to_mempool_secs = 0.0;
@@ -316,7 +348,6 @@ impl PaymentProcessorDriver {
             .await
             .context("failed to parse batch response")?;
 
-        // Poll until all payments in the batch are confirmed
         let confirm_deadline = started_at + Duration::from_secs(600);
         let mut broadcast_to_mempool_secs = 0.0;
         let mut broadcast_to_confirmed_secs = 0.0;
@@ -389,9 +420,12 @@ impl PaymentProcessorDriver {
 
 impl Drop for PaymentProcessorDriver {
     fn drop(&mut self) {
-        if let Some(ref mut child) = self.daemon {
+        if let Some(ref mut child) = self.pp_daemon {
             let _ = child.kill();
             let _ = child.wait();
+        }
+        if let Some(ref mut daemon) = self.wallet_daemon {
+            daemon.kill_sync();
         }
     }
 }
@@ -432,9 +466,6 @@ impl WalletDriver for PaymentProcessorDriver {
         _amount_ut: u64,
         _fee_rate: u64,
     ) -> anyhow::Result<TxMetrics> {
-        // The daemon must be running before we can use the API.
-        // We cannot start it from &self (immutable ref), so if the caller
-        // did not call start_daemon first, this will error.
         self.api_send(to_address, _amount_ut).await
     }
 
