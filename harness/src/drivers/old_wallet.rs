@@ -221,6 +221,13 @@ impl OldWalletDriver {
         use tari_rpc::wallet_client::WalletClient;
         use tari_rpc::RescanWalletRequest;
 
+        // NOTE: The upstream gRPC RescanWallet(from_height=0) has a known
+        // limitation where it only rescans the last ~5,000 blocks instead of
+        // scanning from genesis.  B0 in the harness does NOT use this path:
+        // it relies on the wallet's `--seed-words` recovery at startup,
+        // which performs a full genesis scan.  The non-zero from_height
+        // values used in S2/S3/S6/S7 are unaffected.
+
         let h_tip_start = self.get_base_node_tip_height().await?;
         let target_tip = h_tip_start;
         let pid = self

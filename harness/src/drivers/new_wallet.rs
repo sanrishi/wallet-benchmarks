@@ -4,6 +4,7 @@ use std::net::TcpListener;
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::str::FromStr;
+
 use std::time::{Duration, Instant};
 use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
 
@@ -47,6 +48,7 @@ pub struct NewWalletDriver {
     http_client: Client,
     password: String,
     seed_words: String,
+    key_manager: KeyManager,
 }
 
 impl NewWalletDriver {
@@ -60,6 +62,7 @@ impl NewWalletDriver {
         fs::create_dir_all(&data_dir)
             .with_context(|| format!("failed to create {}", data_dir.display()))?;
         let seed_words = Self::load_or_create_seed_words(&data_dir)?;
+        let key_manager = Self::build_key_manager(&seed_words)?;
 
         Ok(Self {
             minotari_bin,
@@ -69,6 +72,7 @@ impl NewWalletDriver {
             http_client: Client::new(),
             password,
             seed_words,
+            key_manager,
         })
     }
 
@@ -84,6 +88,7 @@ impl NewWalletDriver {
     ) -> anyhow::Result<Self> {
         fs::create_dir_all(&data_dir)
             .with_context(|| format!("failed to create {}", data_dir.display()))?;
+        let key_manager = Self::build_key_manager(&seed_words)?;
         Ok(Self {
             minotari_bin,
             data_dir,
@@ -92,6 +97,7 @@ impl NewWalletDriver {
             http_client: Client::new(),
             password,
             seed_words,
+            key_manager,
         })
     }
 
@@ -173,8 +179,8 @@ impl NewWalletDriver {
             .await
     }
 
-    fn key_manager(&self) -> anyhow::Result<KeyManager> {
-        let mnemonic = SeedWords::from_str(&self.seed_words)
+    fn build_key_manager(seed_words: &str) -> anyhow::Result<KeyManager> {
+        let mnemonic = SeedWords::from_str(seed_words)
             .context("failed to parse stored seed words for new_wallet")?;
         let cipher_seed = CipherSeed::from_mnemonic(&mnemonic, None)
             .context("failed to reconstruct cipher seed for new_wallet")?;
@@ -183,6 +189,10 @@ impl NewWalletDriver {
                 .map_err(|_| anyhow!("failed to construct seed-words wallet for new_wallet"))?,
         );
         KeyManager::new(wallet).context("failed to build key manager for new_wallet")
+    }
+
+    fn key_manager(&self) -> &KeyManager {
+        &self.key_manager
     }
 
     fn self_address_string(&self) -> anyhow::Result<String> {
@@ -235,29 +245,6 @@ impl NewWalletDriver {
             (None, Some(error)) => Err(anyhow!("submit_transaction failed: {error}")),
             (None, None) => Err(anyhow!("submit_transaction returned no result")),
         }
-    }
-
-    /// Count unspent outputs via the minotari daemon REST API.
-    ///
-    /// Tries the daemon's accounts endpoint first. Returns 0 if the daemon API
-    /// does not expose UTXO count (the balance check in scenario verification
-    /// remains the primary correctness signal).
-    async fn get_utxo_count_via_daemon(&self, daemon: &WalletDaemon) -> anyhow::Result<u64> {
-        #[derive(Deserialize)]
-        struct AccountInfo {
-            #[serde(default)]
-            outputs_count: u64,
-        }
-        let url = format!("{}/accounts/{}", daemon.base_url, DEFAULT_ACCOUNT_NAME);
-        let resp = self.http_client.get(&url).send().await?;
-        if !resp.status().is_success() {
-            return Ok(0);
-        }
-        let info: AccountInfo = resp
-            .json()
-            .await
-            .unwrap_or(AccountInfo { outputs_count: 0 });
-        Ok(info.outputs_count)
     }
 
     /// Find a free ephemeral port.
@@ -521,11 +508,7 @@ impl NewWalletDriver {
         }
 
         let scan_status = self.get_scan_status(&daemon).await?;
-        let outputs_found = if scan_status.outputs_found > 0 {
-            scan_status.outputs_found
-        } else {
-            self.get_utxo_count_via_daemon(&daemon).await.unwrap_or(0)
-        };
+        let outputs_found = scan_status.outputs_found;
         let _ = daemon.stop().await;
         let scanned_tip_height = scan_status.last_scanned_height;
         let scanned_blocks = scanned_tip_height.saturating_sub(from_height);
@@ -626,9 +609,9 @@ impl NewWalletDriver {
         let unsigned_tx = PrepareOneSidedTransactionForSigningResult::from_json(&unsigned_json)
             .context("failed to parse unsigned transaction JSON")?;
 
-        let key_manager = self.key_manager()?;
+        let key_manager = self.key_manager();
         let signed = sign_locked_transaction(
-            &key_manager,
+            key_manager,
             ConsensusConstantsBuilder::new(Network::Esmeralda).build(),
             Network::Esmeralda,
             unsigned_tx,
