@@ -255,5 +255,65 @@ mod tests {
         assert!(path.to_string_lossy().contains("seed_words.txt"));
         assert!(path.starts_with(dir.path()));
     }
+
+    // ── Seed lifecycle (preservation across wipe / recovery) ─────────
+
+    #[test]
+    fn seed_words_persist_across_directory_wipe() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let original = load_or_create_seed_words(dir.path()).unwrap();
+
+        // Simulate wipe + restore: save seed words, delete dir, recreate
+        let saved = original.clone();
+        std::fs::remove_dir_all(dir.path()).unwrap();
+        std::fs::create_dir_all(dir.path()).unwrap();
+        std::fs::write(seed_words_path(dir.path()), &saved).unwrap();
+
+        let restored = load_or_create_seed_words(dir.path()).unwrap();
+        assert_eq!(restored, original, "seed words must survive directory wipe");
+    }
+
+    #[test]
+    fn derive_wallet_keys_recovers_same_wallet_after_recovery() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let words = load_or_create_seed_words(dir.path()).unwrap();
+
+        // Persist seed words, then recover to a new directory
+        let saved_words = words.clone();
+        let recovered_dir = tempfile::TempDir::new().unwrap();
+        std::fs::write(seed_words_path(recovered_dir.path()), &saved_words).unwrap();
+        let recovered = load_or_create_seed_words(recovered_dir.path()).unwrap();
+
+        let (vk1, sk1) = derive_wallet_keys(&words).unwrap();
+        let (vk2, sk2) = derive_wallet_keys(&recovered).unwrap();
+
+        assert_eq!(vk1, vk2, "view key must match after seed recovery");
+        assert_eq!(sk1, sk2, "spend key must match after seed recovery");
+    }
+
+    #[test]
+    fn seed_words_with_birthday_produces_different_output_for_different_birthdays() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let words = load_or_create_seed_words(dir.path()).unwrap();
+
+        let b0 = seed_words_with_birthday(&words, 0).unwrap();
+        let b1 = seed_words_with_birthday(&words, 10).unwrap();
+        let b2 = seed_words_with_birthday(&words, 100).unwrap();
+
+        assert_ne!(b0, b1, "different birthdays should produce different encodings");
+        assert_ne!(b1, b2, "different birthdays should produce different encodings");
+        assert_ne!(b0, b2, "different birthdays should produce different encodings");
+    }
+
+    #[test]
+    fn same_birthday_produces_same_seed_encoding() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let words = load_or_create_seed_words(dir.path()).unwrap();
+
+        let a = seed_words_with_birthday(&words, 42).unwrap();
+        let b = seed_words_with_birthday(&words, 42).unwrap();
+
+        assert_eq!(a, b, "same birthday must produce identical seed encoding");
+    }
 }
 

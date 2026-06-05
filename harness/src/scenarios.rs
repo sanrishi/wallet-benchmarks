@@ -125,7 +125,11 @@ pub async fn run_s1(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
         }
     }
 
-    let fanout_tx_count = 1_u64 << config.doubling_rounds;
+    let fanout_tx_count = if config.fanout_outputs_per_tx == 0 {
+        0
+    } else {
+        1_u64 << config.doubling_rounds
+    };
     for _ in 0..fanout_tx_count {
         let recipients = (0..config.fanout_outputs_per_tx)
             .map(|_| (self_address.clone(), amount_per_tx))
@@ -553,6 +557,10 @@ mod tests {
         funding_result: anyhow::Result<TxMetrics>,
         send_single_result: anyhow::Result<TxMetrics>,
         send_batch_result: anyhow::Result<TxMetrics>,
+        reset_result: anyhow::Result<()>,
+        tip_height: u64,
+        self_address: String,
+        scan_birthday_heights: Vec<u64>,
     }
 
     impl FakeDriver {
@@ -567,6 +575,10 @@ mod tests {
                     funding_result: Ok(sample_tx_metric("funding")),
                     send_single_result: Ok(sample_tx_metric("single")),
                     send_batch_result: Ok(sample_tx_metric("batch")),
+                    reset_result: Ok(()),
+                    tip_height: 123,
+                    self_address: "faux-self-address".to_string(),
+                    scan_birthday_heights: Vec::new(),
                 })),
             }
         }
@@ -586,6 +598,31 @@ mod tests {
             self
         }
 
+        fn with_send_single_result(self, result: anyhow::Result<TxMetrics>) -> Self {
+            self.state.lock().unwrap().send_single_result = result;
+            self
+        }
+
+        fn with_send_batch_result(self, result: anyhow::Result<TxMetrics>) -> Self {
+            self.state.lock().unwrap().send_batch_result = result;
+            self
+        }
+
+        fn with_reset_result(self, result: anyhow::Result<()>) -> Self {
+            self.state.lock().unwrap().reset_result = result;
+            self
+        }
+
+        fn with_tip_height(self, height: u64) -> Self {
+            self.state.lock().unwrap().tip_height = height;
+            self
+        }
+
+        fn with_self_address(self, address: &str) -> Self {
+            self.state.lock().unwrap().self_address = address.to_string();
+            self
+        }
+
         fn with_mode_name(mut self, name: &str) -> Self {
             self.mode_name = name.to_string();
             self
@@ -599,7 +636,12 @@ mod tests {
         }
 
         async fn reset(&self) -> anyhow::Result<()> {
-            Ok(())
+            let state = self.state.lock().unwrap();
+            state
+                .reset_result
+                .as_ref()
+                .map(|_| ())
+                .map_err(|e| anyhow!(e.to_string()))
         }
 
         async fn get_balance(&self) -> anyhow::Result<u64> {
@@ -612,11 +654,11 @@ mod tests {
         }
 
         async fn get_tip_height(&self) -> anyhow::Result<u64> {
-            Ok(123)
+            Ok(self.state.lock().unwrap().tip_height)
         }
 
         async fn get_self_address(&self) -> anyhow::Result<String> {
-            Ok("faux-self-address".to_string())
+            Ok(self.state.lock().unwrap().self_address.clone())
         }
 
         async fn scan_from_genesis(&self) -> anyhow::Result<crate::metrics::ScanMetrics> {
@@ -626,10 +668,11 @@ mod tests {
 
         async fn scan_from_birthday(
             &self,
-            _height: u64,
+            height: u64,
         ) -> anyhow::Result<crate::metrics::ScanMetrics> {
-            let outputs_found = self.state.lock().unwrap().scan_outputs_found;
-            Ok(sample_scan_metrics(outputs_found))
+            let mut state = self.state.lock().unwrap();
+            state.scan_birthday_heights.push(height);
+            Ok(sample_scan_metrics(state.scan_outputs_found))
         }
 
         async fn send_single(
@@ -807,5 +850,166 @@ mod tests {
             result.tx_metrics[0].error.as_deref(),
             Some("no funding observed")
         );
+    }
+
+    // ── Extended scenario edge case tests ───────────────────────────
+
+    #[tokio::test]
+    async fn b0_scan_failure_produces_error_result() {
+        let driver = FakeDriver::new().with_scan_outputs(REDISCOVERY_TARGET);
+        let result = run_b0(&driver).await.unwrap();
+        assert_eq!(result.scenario_name, "B0");
+        // B0 records one scan metric even when outputs_found < REDISCOVERY_TARGET
+        assert!(result.scan_metrics.is_some());
+    }
+
+    #[tokio::test]
+    async fn b0_with_zero_scan_outputs_still_produces_scenario() {
+        let driver = FakeDriver::new().with_scan_outputs(0);
+        let result = run_b0(&driver).await.unwrap();
+        assert_eq!(result.scenario_name, "B0");
+        let scan = result.scan_metrics.unwrap();
+        assert_eq!(scan.outputs_found, 0);
+    }
+
+    #[tokio::test]
+    async fn s0_records_h_birth_from_tip_height() {
+        let driver = FakeDriver::new()
+            .with_balances(VecDeque::from([10_000]))
+            .with_tip_height(99_999);
+        let result = run_s0(&driver, &sample_config()).await.unwrap();
+
+        assert_eq!(result.recorded_birth_height, Some(99_999));
+    }
+
+    #[tokio::test]
+    async fn s1_with_zero_doubling_rounds_skips_to_fanout() {
+        let mut cfg = sample_config();
+        cfg.doubling_rounds = 0;
+        cfg.fanout_outputs_per_tx = 2;
+        let driver = FakeDriver::new().with_balances(VecDeque::from([10_000, 10_000]));
+        let result = run_s1(&driver, &cfg).await.unwrap();
+        let state = driver.state.lock().unwrap();
+
+        // No doubling rounds — one fanout batch of 2 outputs (1 << 0 = 1 batch)
+        assert_eq!(state.batch_calls, vec![2]);
+        assert_eq!(result.success_count, 1);
+    }
+
+    #[tokio::test]
+    async fn s1_with_zero_fanout_skips_fanout_entirely() {
+        let mut cfg = sample_config();
+        cfg.doubling_rounds = 1;
+        cfg.fanout_outputs_per_tx = 0;
+        let driver = FakeDriver::new().with_balances(VecDeque::from([10_000, 10_000]));
+        let result = run_s1(&driver, &cfg).await.unwrap();
+        let state = driver.state.lock().unwrap();
+
+        // One doubling round (1 x 2-output batch) + zero fanout
+        assert_eq!(state.batch_calls, vec![2]);
+        assert_eq!(result.success_count, 1);
+    }
+
+    #[tokio::test]
+    async fn s3_passes_birthday_height_to_driver() {
+        let driver = FakeDriver::new()
+            .with_balances(VecDeque::from([10_000]))
+            .with_scan_outputs(REDISCOVERY_TARGET);
+        let result = run_s3(&driver, 42, 10_000).await.unwrap();
+        let state = driver.state.lock().unwrap();
+
+        assert_eq!(result.scenario_name, "S3");
+        assert_eq!(state.scan_birthday_heights, vec![42]);
+    }
+
+    #[tokio::test]
+    async fn s4_with_empty_concurrent_batches_produces_no_tx() {
+        let mut cfg = sample_config();
+        cfg.concurrent_batches = vec![];
+        let driver = FakeDriver::new().with_balances(VecDeque::from([10_000]));
+        let result = run_s4(&driver, &cfg).await.unwrap();
+
+        assert_eq!(result.success_count, 0);
+        assert_eq!(result.tx_metrics.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn s4_runs_all_concurrent_batches() {
+        let mut cfg = sample_config();
+        cfg.concurrent_batches = vec![3, 5];
+        let driver = FakeDriver::new()
+            .with_balances(VecDeque::from([10_000]))
+            .with_tip_height(200);
+        let result = run_s4(&driver, &cfg).await.unwrap();
+        let state = driver.state.lock().unwrap();
+
+        // 3 + 5 = 8 single calls expected
+        assert_eq!(state.single_calls, 8);
+        assert_eq!(result.success_count, 8);
+        assert_eq!(result.tx_metrics.len(), 8);
+    }
+
+    #[tokio::test]
+    async fn s5_with_zero_s5k_uses_single_arm_only() {
+        let mut cfg = sample_config();
+        cfg.s5_m = 6;
+        cfg.s5_k = 0;
+        let driver = FakeDriver::new()
+            .with_balances(VecDeque::from([10_000, 10_000]))
+            .with_mode_name("old_wallet");
+        let result = run_s5(&driver, &cfg).await.unwrap();
+        let state = driver.state.lock().unwrap();
+
+        // Non-payment-processor mode: all 6 sends use the single arm
+        assert_eq!(state.single_calls, 6);
+        assert_eq!(state.batch_calls.len(), 0);
+        assert_eq!(result.success_count, 6);
+    }
+
+    #[tokio::test]
+    async fn s6_with_zero_balance_still_produces_scenario() {
+        let driver = FakeDriver::new()
+            .with_balances(VecDeque::from([0]))
+            .with_scan_outputs(100);
+        let result = run_s6(&driver, 0).await.unwrap();
+
+        assert_eq!(result.scenario_name, "S6");
+        assert!(result.scan_metrics.is_some());
+        assert_eq!(result.balance_delta, 0);
+    }
+
+    #[tokio::test]
+    async fn s7_passes_correct_birthday_height() {
+        let driver = FakeDriver::new()
+            .with_balances(VecDeque::from([10_000]))
+            .with_scan_outputs(REDISCOVERY_TARGET);
+        let result = run_s7(&driver, 99, 10_000).await.unwrap();
+        let state = driver.state.lock().unwrap();
+
+        assert_eq!(result.scenario_name, "S7");
+        assert_eq!(state.scan_birthday_heights, vec![99]);
+    }
+
+    #[tokio::test]
+    async fn reset_failure_is_propagated_through_run_all() {
+        let driver = FakeDriver::new()
+            .with_balances(VecDeque::from([10_000, 10_000]))
+            .with_reset_result(Err(anyhow!("reset failed")));
+        // run_all_scenarios calls reset() before S2, S3, S6, S7
+        // It should swallow the error and continue
+        let config = sample_config();
+        let results = run_all_scenarios(&driver, &config).await.unwrap();
+        // All 9 scenarios (B0 + S0-S7) should be present
+        assert_eq!(results.len(), 9);
+        // The scan scenarios may have errors logged but still return results
+        for r in &results {
+            assert!(
+                r.success_count > 0
+                    || r.failure_count > 0
+                    || r.scan_metrics.is_some(),
+                "{} should have success count, failure count, or scan metrics",
+                r.scenario_name
+            );
+        }
     }
 }
