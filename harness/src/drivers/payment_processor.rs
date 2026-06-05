@@ -9,6 +9,7 @@ use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::Deserialize;
+use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
 use tokio::process::{Child, Command};
 
 use std::str::FromStr;
@@ -88,7 +89,7 @@ pub struct PaymentProcessorDriver {
     pr_daemon: Mutex<Option<Child>>,
     api_url: Mutex<Option<String>>,
     api_port: u16,
-    pr_port: u16,
+    pr_port: Mutex<u16>,
     pr_url: Mutex<Option<String>>,
     cached_address: OnceLock<String>,
 }
@@ -124,7 +125,7 @@ impl PaymentProcessorDriver {
             pr_daemon: Mutex::new(None),
             api_url: Mutex::new(None),
             api_port: pp_port,
-            pr_port,
+            pr_port: Mutex::new(pr_port),
             pr_url: Mutex::new(None),
             cached_address: OnceLock::new(),
         })
@@ -192,10 +193,15 @@ impl PaymentProcessorDriver {
             .to_str()
             .ok_or_else(|| anyhow!("database path is not valid UTF-8"))?
             .to_string();
-        let port = self.pr_port;
 
         for attempt in 0..5 {
-            let port = if attempt == 0 { port } else { Self::find_free_port()? };
+            let port = if attempt == 0 {
+                *self.pr_port.lock().unwrap()
+            } else {
+                let p = Self::find_free_port()?;
+                *self.pr_port.lock().unwrap() = p;
+                p
+            };
 
             let mut child = Command::new(&self.minotari_bin)
                 .arg("daemon")
@@ -409,8 +415,9 @@ impl PaymentProcessorDriver {
 
     // ── Internal scan logic ──────────────────────────────────────────
 
-    /// Core scan: stop PR daemon, recreate the wallet with `birthday_days`,
-    /// restart PR daemon, and wait for the scan to reach the current tip.
+    /// Core scan: stop both daemons, recreate the wallet with `birthday_days`,
+    /// restart PR daemon (PP daemon is restarted lazily on next send), and
+    /// wait for the scan to reach the current tip.
     async fn scan_from_height(
         &self,
         from_height: u64,
@@ -419,6 +426,8 @@ impl PaymentProcessorDriver {
         let h_tip_start = shared::get_tip_height(&self.http_client, &self.base_node_url).await?;
         let started_at = Instant::now();
 
+        // Stop both daemons so the PP daemon doesn't hold stale wallet state.
+        self.stop_pp_daemon().await;
         self.stop_pr_daemon().await;
 
         let db_path = self.database_path();
@@ -430,7 +439,19 @@ impl PaymentProcessorDriver {
         self.create_wallet(birthday_days).await?;
         self.start_pr_daemon().await?;
 
+        let pr_pid = self
+            .pr_daemon
+            .lock()
+            .unwrap()
+            .as_ref()
+            .and_then(|c| c.id())
+            .map(Pid::from_u32);
+
         let deadline = started_at + Duration::from_secs(3600);
+        let mut system = System::new_all();
+        let mut peak_rss_kb = 0_u64;
+        let mut peak_cpu_percent = 0.0_f64;
+
         loop {
             let status = self.get_scan_status().await?;
             if status.last_scanned_height >= h_tip_start {
@@ -449,9 +470,20 @@ impl PaymentProcessorDriver {
                     h_tip_start,
                     h_tip_end,
                     outputs_found: status.outputs_found,
-                    peak_rss_kb: 0,
-                    peak_cpu_percent: 0.0,
+                    peak_rss_kb,
+                    peak_cpu_percent,
                 });
+            }
+            if let Some(pid) = pr_pid {
+                system.refresh_processes_specifics(
+                    ProcessesToUpdate::Some(&[pid]),
+                    false,
+                    ProcessRefreshKind::nothing().with_memory().with_cpu(),
+                );
+                if let Some(process) = system.process(pid) {
+                    peak_rss_kb = peak_rss_kb.max(process.memory());
+                    peak_cpu_percent = peak_cpu_percent.max(process.cpu_usage() as f64);
+                }
             }
             if Instant::now() > deadline {
                 return Err(anyhow!(
@@ -661,15 +693,26 @@ impl PaymentProcessorDriver {
 
 impl Drop for PaymentProcessorDriver {
     fn drop(&mut self) {
+        /// Signal termination and poll for exit to prevent zombie processes.
+        /// Wakes every 50 ms for up to 1 s per child; if the process hasn't
+        /// exited by then we detach (zombie risk is accepted after timeout).
+        fn kill_and_reap(child: &mut Child) {
+            let _ = child.start_kill();
+            for _ in 0..20 {
+                if child.try_wait().ok().flatten().is_some() {
+                    return;
+                }
+                std::thread::sleep(Duration::from_millis(50));
+            }
+        }
+
         // Mutex::get_mut is safe in Drop because &mut self guarantees no
         // other references exist.
         if let Some(ref mut child) = *self.pp_daemon.get_mut().unwrap() {
-            drop(child.kill());
-            drop(child.try_wait());
+            kill_and_reap(child);
         }
         if let Some(ref mut child) = *self.pr_daemon.get_mut().unwrap() {
-            drop(child.kill());
-            drop(child.try_wait());
+            kill_and_reap(child);
         }
     }
 }
