@@ -152,5 +152,72 @@ grpc_port = 18142
         let c = parse(&toml);
         assert_eq!(c.concurrent_batches, vec![8, 16, 32]);
     }
+
+    // ── proptest: config round-trip ──────────────────────────────────
+
+    use proptest::prelude::*;
+
+    fn arbitrary_string(max_len: usize) -> impl Strategy<Value = String> {
+        "[a-zA-Z0-9/._:-]*".prop_filter("string within max_len", move |s| s.len() <= max_len)
+    }
+
+    prop_compose! {
+        fn arbitrary_config()(
+            a_fund in 0u64..1_000_000_000_000_000u64,
+            c_min in 0u64..100u64,
+            volume_target in 0u64..10_000u64,
+            doubling_rounds in 0u64..20u64,
+            fanout_outputs_per_tx in 0u64..100u64,
+            concurrent_batches in proptest::collection::vec(0u64..100u64, 0..10),
+            s4_t_budget_secs in 0u64..3600u64,
+            s5_m in 0u64..1000u64,
+            s5_k in 0u64..100u64,
+            tx_amount_ut in 0u64..1_000_000u64,
+            fee_rate in arbitrary_string(10),
+            grpc_port in 0u16..65535u16,
+        ) -> Config {
+            Config {
+                a_fund, c_min, volume_target, doubling_rounds,
+                fanout_outputs_per_tx, concurrent_batches,
+                s4_t_budget_secs, s5_m, s5_k, tx_amount_ut,
+                fee_rate,
+                base_node_grpc_url: String::new(),
+                base_node_http_url: String::new(),
+                console_wallet_version: String::new(),
+                minotari_cli_version: String::new(),
+                base_node_version: String::new(),
+                wallet_bin_path: String::new(),
+                minotari_bin_path: String::new(),
+                payment_processor_bin_path: String::new(),
+                old_wallet_password: String::new(),
+                new_wallet_password: String::new(),
+                payment_processor_password: String::new(),
+                old_wallet_data_dir: String::new(),
+                new_wallet_data_dir: String::new(),
+                payment_processor_data_dir: String::new(),
+                grpc_port,
+            }
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn config_toml_round_trip(cfg in arbitrary_config()) {
+            let serialized = toml::to_string(&cfg).unwrap();
+            let deserialized: Config = toml::from_str(&serialized).unwrap();
+            assert_eq!(deserialized.a_fund, cfg.a_fund);
+            assert_eq!(deserialized.c_min, cfg.c_min);
+            assert_eq!(deserialized.volume_target, cfg.volume_target);
+            assert_eq!(deserialized.doubling_rounds, cfg.doubling_rounds);
+            assert_eq!(deserialized.fanout_outputs_per_tx, cfg.fanout_outputs_per_tx);
+            assert_eq!(deserialized.concurrent_batches, cfg.concurrent_batches);
+            assert_eq!(deserialized.s4_t_budget_secs, cfg.s4_t_budget_secs);
+            assert_eq!(deserialized.s5_m, cfg.s5_m);
+            assert_eq!(deserialized.s5_k, cfg.s5_k);
+            assert_eq!(deserialized.tx_amount_ut, cfg.tx_amount_ut);
+            assert_eq!(deserialized.fee_rate, cfg.fee_rate);
+            assert_eq!(deserialized.grpc_port, cfg.grpc_port);
+        }
+    }
 }
 

@@ -248,6 +248,26 @@ mod tests {
 
     // ── seed_words_path ──────────────────────────────────────────────
 
+    // ── proptest: parse_balance_output ───────────────────────────────
+
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn parse_balance_any_non_negative_number(h in 0u64..10_000_000_000_000u64) {
+            let with_commas = h.to_string()
+                .as_bytes()
+                .rchunks(3)
+                .rev()
+                .map(|chunk| std::str::from_utf8(chunk).unwrap())
+                .collect::<Vec<_>>()
+                .join(",");
+            let output = format!("Balance at height 42: {with_commas} µT\n");
+            let result = parse_balance_output(&output).unwrap();
+            assert_eq!(result, h);
+        }
+    }
+
     #[test]
     fn seed_words_path_is_under_data_dir() {
         let dir = tempfile::TempDir::new().unwrap();
@@ -314,6 +334,117 @@ mod tests {
         let b = seed_words_with_birthday(&words, 42).unwrap();
 
         assert_eq!(a, b, "same birthday must produce identical seed encoding");
+    }
+
+    // ── wiremock: get_tip_height HTTP client ─────────────────────────
+
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    async fn mock_tip_server(height: u64) -> MockServer {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/get_tip_info"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "metadata": { "best_block_height": height }
+            })))
+            .mount(&server)
+            .await;
+        server
+    }
+
+    #[tokio::test]
+    async fn get_tip_height_returns_height() {
+        let server = mock_tip_server(123_456).await;
+        let client = reqwest::Client::new();
+        let height = get_tip_height(&client, &server.uri()).await.unwrap();
+        assert_eq!(height, 123_456);
+    }
+
+    #[tokio::test]
+    async fn get_tip_height_zero_returns_zero() {
+        let server = mock_tip_server(0).await;
+        let client = reqwest::Client::new();
+        let height = get_tip_height(&client, &server.uri()).await.unwrap();
+        assert_eq!(height, 0);
+    }
+
+    #[tokio::test]
+    async fn get_tip_height_large_height() {
+        let server = mock_tip_server(9_999_999).await;
+        let client = reqwest::Client::new();
+        let height = get_tip_height(&client, &server.uri()).await.unwrap();
+        assert_eq!(height, 9_999_999);
+    }
+
+    #[tokio::test]
+    async fn get_tip_height_errors_on_404() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/get_tip_info"))
+            .respond_with(ResponseTemplate::new(404))
+            .mount(&server)
+            .await;
+        let client = reqwest::Client::new();
+        let result = get_tip_height(&client, &server.uri()).await;
+        assert!(result.is_err(), "expected error for 404 response");
+    }
+
+    #[tokio::test]
+    async fn get_tip_height_errors_on_bad_json() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/get_tip_info"))
+            .respond_with(ResponseTemplate::new(200).set_body_string("not json"))
+            .mount(&server)
+            .await;
+        let client = reqwest::Client::new();
+        let result = get_tip_height(&client, &server.uri()).await;
+        assert!(result.is_err(), "expected error for bad JSON");
+    }
+
+    #[tokio::test]
+    async fn get_tip_height_errors_on_missing_field() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/get_tip_info"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "metadata": {}
+            })))
+            .mount(&server)
+            .await;
+        let client = reqwest::Client::new();
+        let result = get_tip_height(&client, &server.uri()).await;
+        assert!(result.is_err(), "expected error when best_block_height is missing");
+    }
+
+    #[tokio::test]
+    async fn get_tip_height_errors_on_server_error() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/get_tip_info"))
+            .respond_with(ResponseTemplate::new(500))
+            .mount(&server)
+            .await;
+        let client = reqwest::Client::new();
+        let result = get_tip_height(&client, &server.uri()).await;
+        assert!(result.is_err(), "expected error for 500 response");
+    }
+
+    #[tokio::test]
+    async fn get_tip_height_errors_on_timeout() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/get_tip_info"))
+            .respond_with(ResponseTemplate::new(200).set_delay(std::time::Duration::from_secs(10)))
+            .mount(&server)
+            .await;
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_millis(100))
+            .build()
+            .unwrap();
+        let result = get_tip_height(&client, &server.uri()).await;
+        assert!(result.is_err(), "expected error for timeout");
     }
 }
 
