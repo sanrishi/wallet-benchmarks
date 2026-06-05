@@ -27,19 +27,19 @@ use crate::drivers::shared::{derive_wallet_keys, seed_words_with_birthday, DEFAU
 use crate::metrics::{ScanMetrics, TxMetrics};
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct PaymentResponse {
     payment_id: String,
     status: String,
     recipient_address: String,
     amount: i64,
     failure_reason: Option<String>,
-    #[allow(dead_code)]
     mined_height: Option<i64>,
-    #[allow(dead_code)]
     mined_timestamp: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct BulkPaymentResponse {
     batch_id: String,
     status: String,
@@ -500,7 +500,7 @@ impl PaymentProcessorDriver {
         let confirm_deadline = started_at + Duration::from_secs(600);
         let tx_id = payment.payment_id.clone();
         let mut broadcast_to_mempool_secs = 0.0;
-        let mut broadcast_to_confirmed_secs = 0.0;
+        let broadcast_to_confirmed_secs;
 
         loop {
             if Instant::now() > confirm_deadline {
@@ -520,7 +520,15 @@ impl PaymentProcessorDriver {
                         if broadcast_to_mempool_secs == 0.0 {
                             broadcast_to_mempool_secs = broadcast_to_confirmed_secs;
                         }
-                        break;
+                        return Ok(TxMetrics {
+                            tx_id,
+                            construction_secs,
+                            broadcast_to_mempool_secs,
+                            broadcast_to_confirmed_secs,
+                            fee_paid: 0,
+                            success: true,
+                            error: None,
+                        });
                     }
                     "Failed" | "Cancelled" => {
                         let reason = status_payment.failure_reason.unwrap_or_default();
@@ -534,16 +542,6 @@ impl PaymentProcessorDriver {
             }
             tokio::time::sleep(Duration::from_millis(1000)).await;
         }
-
-        Ok(TxMetrics {
-            tx_id,
-            construction_secs,
-            broadcast_to_mempool_secs,
-            broadcast_to_confirmed_secs,
-            fee_paid: 0,
-            success: true,
-            error: None,
-        })
     }
 
     async fn api_send_batch(&self, recipients: Vec<(String, u64)>) -> anyhow::Result<TxMetrics> {
@@ -593,7 +591,6 @@ impl PaymentProcessorDriver {
 
         let confirm_deadline = started_at + Duration::from_secs(600);
         let mut broadcast_to_mempool_secs = 0.0;
-        let mut broadcast_to_confirmed_secs = 0.0;
         let payment_ids: Vec<String> = batch
             .payments
             .iter()
@@ -636,11 +633,19 @@ impl PaymentProcessorDriver {
                 return Err(anyhow!("batch payment failed: {fail_reason}"));
             }
             if all_done {
-                broadcast_to_confirmed_secs = started_at.elapsed().as_secs_f64();
+                let confirmed_secs = started_at.elapsed().as_secs_f64();
                 if broadcast_to_mempool_secs == 0.0 {
-                    broadcast_to_mempool_secs = broadcast_to_confirmed_secs;
+                    broadcast_to_mempool_secs = confirmed_secs;
                 }
-                break;
+                return Ok(TxMetrics {
+                    tx_id,
+                    construction_secs,
+                    broadcast_to_mempool_secs,
+                    broadcast_to_confirmed_secs: confirmed_secs,
+                    fee_paid: 0,
+                    success: true,
+                    error: None,
+                });
             }
 
             if broadcast_to_mempool_secs == 0.0 && started_at.elapsed().as_secs_f64() > 5.0 {
@@ -648,16 +653,6 @@ impl PaymentProcessorDriver {
             }
             tokio::time::sleep(Duration::from_millis(1000)).await;
         }
-
-        Ok(TxMetrics {
-            tx_id,
-            construction_secs,
-            broadcast_to_mempool_secs,
-            broadcast_to_confirmed_secs,
-            fee_paid: 0,
-            success: true,
-            error: None,
-        })
     }
 }
 
@@ -666,12 +661,12 @@ impl Drop for PaymentProcessorDriver {
         // Mutex::get_mut is safe in Drop because &mut self guarantees no
         // other references exist.
         if let Some(ref mut child) = *self.pp_daemon.get_mut().unwrap() {
-            let _ = child.kill();
-            let _ = child.try_wait();
+            drop(child.kill());
+            drop(child.try_wait());
         }
         if let Some(ref mut child) = *self.pr_daemon.get_mut().unwrap() {
-            let _ = child.kill();
-            let _ = child.try_wait();
+            drop(child.kill());
+            drop(child.try_wait());
         }
     }
 }

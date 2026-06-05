@@ -102,7 +102,7 @@ async fn print_old_wallet_address(old_wallet: &OldWalletDriver) {
 }
 
 async fn print_all_wallet_addresses(config: &Config) -> anyhow::Result<()> {
-    let mut old_wallet = OldWalletDriver::new(
+    let old_wallet = OldWalletDriver::new(
         require_nonempty_path("wallet_bin_path", &config.wallet_bin_path)?,
         require_nonempty_path("old_wallet_data_dir", &config.old_wallet_data_dir)?,
         config.old_wallet_password.clone(),
@@ -172,6 +172,7 @@ fn tx_duration_sum(metrics: &[metrics::TxMetrics]) -> f64 {
         .sum()
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_report(
     cpu_model: String,
     ram_kb: u64,

@@ -30,9 +30,11 @@ pub fn scenario_error_result(name: &str, error: String) -> ScenarioResult {
     }
 }
 
-const REDISCOVERY_TARGET: u64 = 512;
+#[allow(unused)]
 const POLL_INTERVAL_MS: u64 = 500;
+#[allow(unused)]
 const CONFIRMATION_TIMEOUT_SECS: u64 = 300;
+const REDISCOVERY_TARGET: u64 = 512;
 
 pub async fn run_b0(driver: &dyn WalletDriver) -> anyhow::Result<ScenarioResult> {
     let started_at = Instant::now();
@@ -502,6 +504,7 @@ async fn attempt_send_batch(
     }
 }
 
+#[allow(unused)]
 async fn wait_for_tip_height(
     driver: &dyn WalletDriver,
     expected_tip: u64,

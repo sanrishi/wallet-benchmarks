@@ -765,6 +765,7 @@ pub(super) struct WalletDaemon {
 }
 
 impl WalletDaemon {
+    #[allow(dead_code)]
     pub(super) fn base_url(&self) -> &str {
         &self.base_url
     }
@@ -780,6 +781,7 @@ impl WalletDaemon {
     }
 
     /// Synchronous kill for use in Drop handlers.
+    #[allow(dead_code, clippy::let_underscore_future)]
     pub(super) fn kill_sync(&mut self) {
         let _ = self.child.kill();
         let _ = self.child.wait();

@@ -17,6 +17,7 @@ use crate::drivers::shared::seed_words_with_birthday;
 use crate::metrics::{ScanMetrics, TxMetrics};
 
 // Include tonic-generated gRPC types from wallet.proto
+#[allow(dead_code, clippy::doc_overindented_list_items)]
 pub mod tari_rpc {
     tonic::include_proto!("tari.rpc");
 }
@@ -272,7 +273,7 @@ impl OldWalletDriver {
         let mut system = System::new_all();
         let mut peak_rss_kb = 0_u64;
         let mut peak_cpu_percent = 0.0_f64;
-        let mut h_tip_end = 0u64;
+        let mut h_tip_end;
 
         loop {
             if Instant::now() > deadline {
@@ -471,6 +472,7 @@ impl OldWalletDriver {
         use tari_rpc::GetAllCompletedTransactionsRequest;
 
         let mut client = WalletClient::connect(self.grpc_url.clone()).await?;
+        #[allow(deprecated)]
         let response = client
             .get_all_completed_transactions(GetAllCompletedTransactionsRequest {
                 offset: 0,
