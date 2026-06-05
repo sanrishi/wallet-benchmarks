@@ -4,7 +4,7 @@ use std::net::TcpListener;
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::str::FromStr;
-
+use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
 
@@ -49,6 +49,7 @@ pub struct NewWalletDriver {
     password: String,
     seed_words: String,
     key_manager: KeyManager,
+    cached_address: OnceLock<String>,
 }
 
 impl NewWalletDriver {
@@ -73,6 +74,7 @@ impl NewWalletDriver {
             password,
             seed_words,
             key_manager,
+            cached_address: OnceLock::new(),
         })
     }
 
@@ -171,6 +173,9 @@ impl NewWalletDriver {
     }
 
     fn self_address_string(&self) -> anyhow::Result<String> {
+        if let Some(addr) = self.cached_address.get() {
+            return Ok(addr.clone());
+        }
         let mnemonic = SeedWords::from_str(&self.seed_words)
             .context("failed to parse stored seed words for new_wallet address")?;
         let cipher_seed = CipherSeed::from_mnemonic(&mnemonic, None)
@@ -187,7 +192,9 @@ impl NewWalletDriver {
             None,
         )
         .context("failed to construct new_wallet self address")?;
-        Ok(address.to_base58())
+        let addr_str = address.to_base58();
+        let _ = self.cached_address.set(addr_str.clone());
+        Ok(addr_str)
     }
 
     async fn submit_signed_transaction(

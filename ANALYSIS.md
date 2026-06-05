@@ -199,6 +199,81 @@ most important non-network invariants:
 
 These tests complement the runtime harness behavior rather than replacing it.
 
+## Known gRPC RescanWallet Limitation
+
+The `minotari_console_wallet` gRPC `RescanWallet(from_height=0)` call only scans
+the last ~5,000 blocks — it does **not** perform a true genesis scan.  The
+harness works around this in `old_wallet`:
+
+1. **Genesis scans (`B0`, `S2`, `S6`)** — The wallet is started with
+   `--seed-words` whose cipher-seed birthday is set to `0` (day-count 0 = Unix
+   epoch).  The wallet implicitly performs a full genesis scan at startup, so no
+   `RescanWallet` gRPC call is needed.
+
+2. **Birthday scans (`S3`, `S7`)** — `RescanWallet(from_height=X)` is issued
+   *after* startup for `X > 0` (works correctly upstream).  Height `0` is never
+   passed to `RescanWallet`; the birthday-mechanism above is used instead.
+
+This is documented inline at `harness/src/drivers/old_wallet.rs:226-228` and in
+the `do_scan()` implementation.
+
+## Mode 3 Architecture: Daemon Microservice vs. Vendored Submodule
+
+Mode 3 (`payment_processor`) uses a dual-daemon architecture:
+
+```
+┌─────────────────────┐     HTTP ───►  ┌──────────────────────┐
+│  minotari daemon    │                 │  minotari_payment_   │
+│  (PR account daemon)│ ◄─── HTTP      │  processor daemon    │
+│  /balance           │                 │  POST /v1/payments   │
+│  /scan_status       │                 │  POST /v1/batches    │
+│  /version           │                 │                      │
+└─────────────────────┘                 └──────────────────────┘
+         ▲                                        │
+         │          ┌──────────────────┐           │
+         └──────────│ minotari CLI     │◄──────────┘
+                    │ (offline signing)│
+                    └──────────────────┘
+```
+
+**Why a network-decoupled microservice instead of a vendored submodule:**
+
+1. **Faithful reproduction of production topology** — The
+   `minotari_payment_processor` binary *is* the production payment processor, a
+   standalone HTTP microservice.  Vendoring its Rust types as a git submodule
+   and calling its functions in-process would benchmark a call-graph that does
+   not exist in production.  The harness would measure library dispatch
+   overhead, not real IPC, HTTP serialization, and cross-process latency.
+
+2. **3-process benchmark fidelity** — Issue `#1` requires benchmarking the
+   wallet in three distinct modes.  Mode 3's intent is to measure the real
+   multi-process payment pipeline: wallet daemon → payment processor → base
+   node.  A vendored-submodule approach collapses this into a single process,
+   hiding cross-process overheads that matter for throughput measurement.
+
+3. **No upstream maintenance burden from vendoring** — Vendoring a snapshot of
+   the payment processor crate would require ongoing updates to track upstream
+   API changes.  The microservice approach consumes the *released binary*, so
+   the harness automatically tracks whatever version the operator pins in
+   `config.toml`, with no build-time coupling to the payment processor's
+   internal dependency graph.
+
+4. **Scan-surface availability** — The payment processor microservice does not
+   expose wallet scan/sync endpoints.  By keeping the `minotari daemon`
+   (PR account daemon) as a separate managed process, the harness can run the
+   full `B0`–`S7` matrix for Mode 3.  If the payment processor were vendored
+   as a submodule, scan scenarios would require an entirely separate wallet
+   integration, adding complexity without improving benchmark fidelity.
+
+5. **Comparable overhead to PR #6's vendored-submodule approach** — The
+   alternative approach (vendored payment-processor submodule) eliminates the
+   HTTP hop between the harness and the payment processor, but it introduces a
+   different artifact: the benchmark measures in-process function calls against
+   the payment processor's internal types rather than the actual released
+   binary.  For a benchmark whose purpose is measuring *wallet* performance
+   (not payment-processor dispatch), the microservice approach gives a more
+   representative baseline.
+
 ## Ready-For-Run Checklist
 
 Before the canonical funded run:

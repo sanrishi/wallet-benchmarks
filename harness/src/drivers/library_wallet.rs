@@ -3,6 +3,7 @@
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
 use anyhow::Context;
@@ -72,6 +73,7 @@ pub struct LibraryWalletDriver {
     confirmation_window: u64,
     password: String,
     http_client: Client,
+    cached_address: OnceLock<String>,
 }
 
 impl LibraryWalletDriver {
@@ -95,6 +97,7 @@ impl LibraryWalletDriver {
             confirmation_window,
             password,
             http_client: Client::new(),
+            cached_address: OnceLock::new(),
         })
     }
 
@@ -177,6 +180,9 @@ impl LibraryWalletDriver {
     }
 
     fn self_address_from_seed(&self) -> anyhow::Result<String> {
+        if let Some(addr) = self.cached_address.get() {
+            return Ok(addr.clone());
+        }
         let mnemonic = SeedWords::from_str(&self.seed_words)
             .context("failed to parse seed words for address derivation")?;
         let cipher_seed = CipherSeed::from_mnemonic(&mnemonic, None)
@@ -193,7 +199,9 @@ impl LibraryWalletDriver {
             None,
         )
         .context("failed to construct TariAddress")?;
-        Ok(address.to_base58())
+        let addr_str = address.to_base58();
+        let _ = self.cached_address.set(addr_str.clone());
+        Ok(addr_str)
     }
 
     async fn run_recovery_scan(&self) -> anyhow::Result<ScanMetrics> {

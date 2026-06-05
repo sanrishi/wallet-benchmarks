@@ -2,6 +2,7 @@ use std::net::TcpListener;
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Mutex;
+use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, Context};
@@ -89,6 +90,7 @@ pub struct PaymentProcessorDriver {
     api_port: u16,
     pr_port: u16,
     pr_url: Mutex<Option<String>>,
+    cached_address: OnceLock<String>,
 }
 
 impl PaymentProcessorDriver {
@@ -124,6 +126,7 @@ impl PaymentProcessorDriver {
             api_port: pp_port,
             pr_port,
             pr_url: Mutex::new(None),
+            cached_address: OnceLock::new(),
         })
     }
 
@@ -712,6 +715,9 @@ impl WalletDriver for PaymentProcessorDriver {
     }
 
     async fn get_self_address(&self) -> anyhow::Result<String> {
+        if let Some(addr) = self.cached_address.get() {
+            return Ok(addr.clone());
+        }
         let words = self.seed_words.lock().unwrap();
         let mnemonic =
             SeedWords::from_str(&words).context("failed to parse seed words for address")?;
@@ -729,7 +735,10 @@ impl WalletDriver for PaymentProcessorDriver {
             None,
         )
         .context("failed to construct self address")?;
-        Ok(address.to_base58())
+        let addr_str = address.to_base58();
+        drop(words);
+        let _ = self.cached_address.set(addr_str.clone());
+        Ok(addr_str)
     }
 
     async fn scan_from_genesis(&self) -> anyhow::Result<ScanMetrics> {
