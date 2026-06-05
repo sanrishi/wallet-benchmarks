@@ -18,7 +18,7 @@ use scenarios::*;
 use sysinfo::System;
 
 struct OldWalletGuard<'a> {
-    driver: &'a mut OldWalletDriver,
+    driver: &'a OldWalletDriver,
 }
 
 impl Drop for OldWalletGuard<'_> {
@@ -28,79 +28,70 @@ impl Drop for OldWalletGuard<'_> {
 }
 
 async fn run_old_wallet_scenarios(
-    old_wallet: &mut OldWalletDriver,
+    old_wallet: &OldWalletDriver,
     config: &Config,
 ) -> Vec<ScenarioResult> {
     let mut scenarios = Vec::new();
 
-    let _ = restart_old_wallet_for_scan(old_wallet).await;
-    print_old_wallet_address(old_wallet).await;
-    let guard = OldWalletGuard { driver: old_wallet };
-
-    scenarios.push(match run_b0(&*guard.driver).await {
+    // B0: scan_from_genesis handles the full stop/reset/start lifecycle internally.
+    scenarios.push(match run_b0(old_wallet).await {
         Ok(s) => s,
         Err(e) => scenario_error_result("B0", e.to_string()),
     });
-    let s0 = match run_s0(&*guard.driver, config).await {
+    print_old_wallet_address(old_wallet).await;
+    let _guard = OldWalletGuard { driver: old_wallet };
+
+    let s0 = match run_s0(old_wallet, config).await {
         Ok(s) => s,
         Err(e) => scenario_error_result("S0", e.to_string()),
     };
     let h_birth = s0.recorded_birth_height.unwrap_or(0);
     scenarios.push(s0);
-    scenarios.push(match run_s1(&*guard.driver, config).await {
+    scenarios.push(match run_s1(old_wallet, config).await {
         Ok(s) => s,
         Err(e) => scenario_error_result("S1", e.to_string()),
     });
-    let post_s1_balance = guard.driver.get_balance().await.unwrap_or(0);
+    let post_s1_balance = old_wallet.get_balance().await.unwrap_or(0);
 
-    let _ = restart_old_wallet_for_scan(guard.driver).await;
-    scenarios.push(match run_s2(&*guard.driver, post_s1_balance).await {
+    // S2: scan_from_genesis handles the full lifecycle internally.
+    scenarios.push(match run_s2(old_wallet, post_s1_balance).await {
         Ok(s) => s,
         Err(e) => scenario_error_result("S2", e.to_string()),
     });
 
-    let _ = restart_old_wallet_for_scan(guard.driver).await;
+    // S3: scan_from_birthday handles the full lifecycle internally.
     scenarios.push(
-        match run_s3(&*guard.driver, h_birth, post_s1_balance).await {
+        match run_s3(old_wallet, h_birth, post_s1_balance).await {
             Ok(s) => s,
             Err(e) => scenario_error_result("S3", e.to_string()),
         },
     );
 
-    scenarios.push(match run_s4(&*guard.driver, config).await {
+    scenarios.push(match run_s4(old_wallet, config).await {
         Ok(s) => s,
         Err(e) => scenario_error_result("S4", e.to_string()),
     });
-    scenarios.push(match run_s5(&*guard.driver, config).await {
+    scenarios.push(match run_s5(old_wallet, config).await {
         Ok(s) => s,
         Err(e) => scenario_error_result("S5", e.to_string()),
     });
-    let post_s5_balance = guard.driver.get_balance().await.unwrap_or(0);
+    let post_s5_balance = old_wallet.get_balance().await.unwrap_or(0);
 
-    let _ = restart_old_wallet_for_scan(guard.driver).await;
-    scenarios.push(match run_s6(&*guard.driver, post_s5_balance).await {
+    // S6: scan_from_genesis handles the full lifecycle internally.
+    scenarios.push(match run_s6(old_wallet, post_s5_balance).await {
         Ok(s) => s,
         Err(e) => scenario_error_result("S6", e.to_string()),
     });
 
-    let _ = restart_old_wallet_for_scan(guard.driver).await;
+    // S7: scan_from_birthday handles the full lifecycle internally.
     scenarios.push(
-        match run_s7(&*guard.driver, h_birth, post_s5_balance).await {
+        match run_s7(old_wallet, h_birth, post_s5_balance).await {
             Ok(s) => s,
             Err(e) => scenario_error_result("S7", e.to_string()),
         },
     );
 
     scenarios
-}
-
-async fn restart_old_wallet_for_scan(
-    old_wallet: &mut OldWalletDriver,
-) -> anyhow::Result<()> {
-    old_wallet.stop();
-    old_wallet.reset().await?;
-    old_wallet.set_seed_birthday()?;
-    old_wallet.start().await
 }
 
 async fn print_old_wallet_address(old_wallet: &OldWalletDriver) {
@@ -281,7 +272,7 @@ async fn main() -> anyhow::Result<()> {
 
     let mut reports = Vec::new();
 
-    let mut old_wallet = OldWalletDriver::new(
+    let old_wallet = OldWalletDriver::new(
         require_nonempty_path("wallet_bin_path", &config.wallet_bin_path)?,
         require_nonempty_path("old_wallet_data_dir", &config.old_wallet_data_dir)?,
         config.old_wallet_password.clone(),
@@ -289,7 +280,7 @@ async fn main() -> anyhow::Result<()> {
         config.base_node_http_url.clone(),
         config.c_min,
     )?;
-    let old_wallet_scenarios = run_old_wallet_scenarios(&mut old_wallet, &config).await;
+    let old_wallet_scenarios = run_old_wallet_scenarios(&old_wallet, &config).await;
     reports.push(build_report(
         cpu_model.clone(),
         ram_kb,

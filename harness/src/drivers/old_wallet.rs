@@ -13,7 +13,7 @@ use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
 
 use crate::driver::WalletDriver;
 use crate::drivers::shared;
-use crate::drivers::shared::{seed_words_with_birthday};
+use crate::drivers::shared::seed_words_with_birthday;
 use crate::metrics::{ScanMetrics, TxMetrics};
 
 // Include tonic-generated gRPC types from wallet.proto
@@ -22,17 +22,17 @@ pub mod tari_rpc {
 }
 
 pub struct OldWalletDriver {
-    pub wallet_bin: PathBuf, // path to minotari_console_wallet binary
-    pub data_dir: PathBuf,   // wallet data directory (wiped on reset)
+    pub wallet_bin: PathBuf,
+    pub data_dir: PathBuf,
     pub password: String,
-    pub grpc_url: String, // e.g. "http://127.0.0.1:18143"
+    pub grpc_url: String,
     pub grpc_port: u16,
     pub base_node_url: String,
     pub confirmation_window: u64,
     http_client: Client,
-    seed_words: String,
-    process: Option<Child>,                     // spawned wallet process
-    stderr_capture: Option<Arc<Mutex<String>>>, // captured stderr from child
+    seed_words: Mutex<String>,
+    process: Mutex<Option<Child>>,
+    stderr_capture: Mutex<Option<Arc<Mutex<String>>>>,
 }
 
 impl OldWalletDriver {
@@ -56,9 +56,9 @@ impl OldWalletDriver {
             base_node_url,
             confirmation_window,
             http_client: Client::new(),
-            seed_words,
-            process: None,
-            stderr_capture: None,
+            seed_words: Mutex::new(seed_words),
+            process: Mutex::new(None),
+            stderr_capture: Mutex::new(None),
         })
     }
 
@@ -66,15 +66,18 @@ impl OldWalletDriver {
         shared::load_or_create_seed_words(data_dir)
     }
 
-    pub fn set_seed_birthday(&mut self) -> anyhow::Result<()> {
-        self.seed_words = seed_words_with_birthday(&self.seed_words, 0)?;
+    pub fn set_seed_birthday(&self, birthday_days: u64) -> anyhow::Result<()> {
+        let current = self.seed_words.lock().unwrap().clone();
+        let updated = seed_words_with_birthday(&current, birthday_days)?;
+        *self.seed_words.lock().unwrap() = updated;
         Ok(())
     }
 
     /// Spawn the wallet process and block until gRPC port responds or timeout
-    pub async fn start(&mut self) -> anyhow::Result<()> {
+    pub async fn start(&self) -> anyhow::Result<()> {
         let stderr_capture = Arc::new(Mutex::new(String::new()));
         let stderr_capture_clone = stderr_capture.clone();
+        let seed_words = self.seed_words.lock().unwrap().clone();
 
         let mut child = Command::new(&self.wallet_bin)
             .arg("--grpc-enabled")
@@ -83,11 +86,12 @@ impl OldWalletDriver {
             .arg("--password")
             .arg(&self.password)
             .arg("--seed-words")
-            .arg(&self.seed_words)
+            .arg(&seed_words)
             .arg(format!("--base-path={}", self.data_dir.display()))
             .arg("--non-interactive-mode")
             .stderr(Stdio::piped())
-            .spawn()?;
+            .spawn()
+            .map_err(|e| anyhow!("failed to spawn wallet process: {e}"))?;
 
         // Read stderr in a background thread so the pipe does not fill up
         if let Some(stderr_handle) = child.stderr.take() {
@@ -103,7 +107,6 @@ impl OldWalletDriver {
         let deadline = Instant::now() + Duration::from_secs(120);
         loop {
             if Instant::now() > deadline {
-                // Process failed to start – include any captured stderr
                 let _ = child.kill();
                 let _ = child.wait();
                 let stderr = stderr_capture.lock().unwrap().clone();
@@ -116,7 +119,6 @@ impl OldWalletDriver {
             }
             match child.try_wait() {
                 Ok(Some(status)) => {
-                    // Process exited early – include captured stderr
                     std::thread::sleep(Duration::from_millis(100));
                     let stderr = stderr_capture.lock().unwrap().clone();
                     if !stderr.is_empty() {
@@ -138,14 +140,16 @@ impl OldWalletDriver {
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
 
-        self.process = Some(child);
-        self.stderr_capture = Some(stderr_capture);
+        *self.process.lock().unwrap() = Some(child);
+        *self.stderr_capture.lock().unwrap() = Some(stderr_capture);
         Ok(())
     }
 
     /// Return captured stderr output from the child process, if any
     pub fn captured_stderr(&self) -> String {
         self.stderr_capture
+            .lock()
+            .unwrap()
             .as_ref()
             .and_then(|c| c.lock().ok())
             .map(|guard| guard.clone())
@@ -153,8 +157,8 @@ impl OldWalletDriver {
     }
 
     /// Kill the wallet process
-    pub fn stop(&mut self) {
-        if let Some(ref mut child) = self.process {
+    pub fn stop(&self) {
+        if let Some(ref mut child) = *self.process.lock().unwrap() {
             let _ = child.kill();
             std::thread::sleep(Duration::from_millis(100));
             let _ = child.wait();
@@ -164,7 +168,7 @@ impl OldWalletDriver {
             eprintln!("old_wallet stderr:\n{captured}");
         }
         std::thread::sleep(Duration::from_millis(500));
-        self.process = None;
+        *self.process.lock().unwrap() = None;
     }
 
     pub async fn get_wallet_address(&self) -> anyhow::Result<String> {
@@ -217,36 +221,58 @@ impl OldWalletDriver {
         shared::get_tip_height(&self.http_client, &self.base_node_url).await
     }
 
-    async fn scan_from_height(&self, from_height: u64) -> anyhow::Result<ScanMetrics> {
+    /// Internal helper: restart the wallet with the given birthday and wait for it
+    /// to finish scanning.  If `rescan_from_height` is Some and non-zero, a gRPC
+    /// RescanWallet(height) is issued after startup (non-zero heights work correctly
+    /// upstream; only height=0 is broken — handled via --seed-words birthday=0 instead).
+    async fn do_scan(
+        &self,
+        birthday_days: u64,
+        rescan_from_height: Option<u64>,
+    ) -> anyhow::Result<ScanMetrics> {
         use tari_rpc::wallet_client::WalletClient;
         use tari_rpc::RescanWalletRequest;
 
-        // NOTE: The upstream gRPC RescanWallet(from_height=0) has a known
-        // limitation where it only rescans the last ~5,000 blocks instead of
-        // scanning from genesis.  B0 in the harness does NOT use this path:
-        // it relies on the wallet's `--seed-words` recovery at startup,
-        // which performs a full genesis scan.  The non-zero from_height
-        // values used in S2/S3/S6/S7 are unaffected.
+        // 1. Stop existing process.
+        self.stop();
 
+        // 2. Wipe data dir.
+        self.reset().await?;
+
+        // 3. Set seed words with the requested birthday.
+        self.set_seed_birthday(birthday_days)?;
+
+        // 4. Record pre-scan tip and start the wallet.
         let h_tip_start = self.get_base_node_tip_height().await?;
         let target_tip = h_tip_start;
+        self.start().await?;
+
+        // 5. For non-zero rescan heights, issue gRPC RescanWallet (works correctly
+        //    when from_height > 0).  For height=0 we rely on --seed-words at startup.
+        if let Some(fh) = rescan_from_height {
+            if fh > 0 {
+                let mut client = WalletClient::connect(self.grpc_url.clone()).await?;
+                client
+                    .rescan_wallet(RescanWalletRequest { from_height: fh })
+                    .await?;
+            }
+        }
+
+        // 6. Wait for wallet to sync to tip.
         let pid = self
             .process
+            .lock()
+            .unwrap()
             .as_ref()
             .map(|child| Pid::from_u32(child.id()))
             .ok_or_else(|| anyhow!("wallet process is not running"))?;
-
-        let mut client = WalletClient::connect(self.grpc_url.clone()).await?;
-        client
-            .rescan_wallet(RescanWalletRequest { from_height })
-            .await?;
 
         let started_at = Instant::now();
         let deadline = started_at + Duration::from_secs(1800);
         let mut system = System::new_all();
         let mut peak_rss_kb = 0_u64;
         let mut peak_cpu_percent = 0.0_f64;
-        let mut h_tip_end = h_tip_start;
+        let mut h_tip_end = 0u64;
 
         loop {
             if Instant::now() > deadline {
@@ -275,7 +301,8 @@ impl OldWalletDriver {
         }
 
         let wall_clock_secs = started_at.elapsed().as_secs_f64();
-        let scanned_blocks = target_tip.saturating_sub(from_height);
+        let effective_from = rescan_from_height.unwrap_or(0);
+        let scanned_blocks = target_tip.saturating_sub(effective_from);
         let outputs_found = self.get_utxo_count_via_grpc().await?;
         let blocks_per_sec = if wall_clock_secs > 0.0 {
             scanned_blocks as f64 / wall_clock_secs
@@ -472,9 +499,8 @@ impl WalletDriver for OldWalletDriver {
     }
 
     async fn reset(&self) -> anyhow::Result<()> {
-        // Caller must call stop() before reset() for old_wallet.
         // reset() only handles filesystem; process lifecycle is
-        // managed by start()/stop() in main.rs.
+        // managed by stop()/start() separately.
         let mut last_error = None;
         for _ in 0..20 {
             if self.data_dir.exists() {
@@ -538,11 +564,16 @@ impl WalletDriver for OldWalletDriver {
     }
 
     async fn scan_from_genesis(&self) -> anyhow::Result<ScanMetrics> {
-        self.scan_from_height(0).await
+        // Full genesis scan: set birthday=0, restart wallet (--seed-words triggers
+        // a full genesis scan at startup), wait for sync.  No RescanWallet call
+        // (height=0 is broken upstream).
+        self.do_scan(0, None).await
     }
 
     async fn scan_from_birthday(&self, height: u64) -> anyhow::Result<ScanMetrics> {
-        self.scan_from_height(height).await
+        // Birthday scan: restart wallet with birthday=0 seed words, then issue
+        // RescanWallet(from_height=height) which works correctly for non-zero heights.
+        self.do_scan(0, Some(height)).await
     }
 
     async fn send_single(
