@@ -120,3 +120,140 @@ pub struct TipInfoResponse {
 pub struct TipMetadata {
     pub best_block_height: u64,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── parse_balance_output ─────────────────────────────────────────
+
+    #[test]
+    fn parse_balance_typical() {
+        let out = "Balance at height 1234: 1,234,567 µT\n";
+        assert_eq!(parse_balance_output(out).unwrap(), 1_234_567);
+    }
+
+    #[test]
+    fn parse_balance_thousands_separator() {
+        let out = "Balance at height 42: 1,000,000,000 µT\n";
+        assert_eq!(parse_balance_output(out).unwrap(), 1_000_000_000);
+    }
+
+    #[test]
+    fn parse_balance_zero() {
+        let out = "Balance at height 0: 0 µT\n";
+        assert_eq!(parse_balance_output(out).unwrap(), 0);
+    }
+
+    #[test]
+    fn parse_balance_errors_when_line_missing() {
+        let out = "some random output\n";
+        assert!(parse_balance_output(out).is_err());
+    }
+
+    #[test]
+    fn parse_balance_errors_on_empty() {
+        assert!(parse_balance_output("").is_err());
+    }
+
+    #[test]
+    fn parse_balance_handles_micro_symbol() {
+        // The function replaces ÂµT -> µT, so test the actual
+        // output that has the Unicode micro sign.
+        let out = "Balance at height 5: 500 µT\n";
+        assert_eq!(parse_balance_output(out).unwrap(), 500);
+    }
+
+    // ── seed_words_with_birthday ─────────────────────────────────────
+
+    #[test]
+    fn seed_words_with_birthday_round_trip() {
+        let words = load_or_create_seed_words(&tempfile::TempDir::new().unwrap().path()).unwrap();
+        let modified = seed_words_with_birthday(&words, 42).unwrap();
+        assert!(!modified.is_empty());
+        assert_ne!(modified, words, "birthday should change the seed encoding");
+    }
+
+    #[test]
+    fn seed_words_with_birthday_genesis() {
+        let words = load_or_create_seed_words(&tempfile::TempDir::new().unwrap().path()).unwrap();
+        let genesis = seed_words_with_birthday(&words, 0).unwrap();
+        assert!(!genesis.is_empty());
+    }
+
+    #[test]
+    fn seed_words_with_birthday_errors_on_bad_seed() {
+        assert!(seed_words_with_birthday("not valid seed words", 0).is_err());
+    }
+
+    // ── derive_wallet_keys ───────────────────────────────────────────
+
+    #[test]
+    fn derive_wallet_keys_is_deterministic() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let words = load_or_create_seed_words(dir.path()).unwrap();
+        let (vk1, sk1) = derive_wallet_keys(&words).unwrap();
+        let (vk2, sk2) = derive_wallet_keys(&words).unwrap();
+        assert_eq!(vk1, vk2, "view key must be deterministic");
+        assert_eq!(sk1, sk2, "spend key must be deterministic");
+    }
+
+    #[test]
+    fn derive_wallet_keys_returns_non_empty_hex() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let words = load_or_create_seed_words(dir.path()).unwrap();
+        let (view_key, spend_key) = derive_wallet_keys(&words).unwrap();
+        assert!(!view_key.is_empty(), "view key hex should not be empty");
+        assert!(!spend_key.is_empty(), "spend key hex should not be empty");
+        // Basic hex sanity: all hex chars and even length
+        assert!(view_key.len() % 2 == 0, "view key hex length should be even");
+        assert!(spend_key.len() % 2 == 0, "spend key hex length should be even");
+        assert!(
+            view_key.chars().all(|c| c.is_ascii_hexdigit()),
+            "view key should contain only hex chars"
+        );
+        assert!(
+            spend_key.chars().all(|c| c.is_ascii_hexdigit()),
+            "spend key should contain only hex chars"
+        );
+    }
+
+    #[test]
+    fn derive_wallet_keys_errors_on_bad_seed() {
+        assert!(derive_wallet_keys("not valid seed words").is_err());
+    }
+
+    // ── load_or_create_seed_words ────────────────────────────────────
+
+    #[test]
+    fn creates_seed_words_file_when_missing() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let words = load_or_create_seed_words(dir.path()).unwrap();
+        assert!(!words.is_empty(), "should generate new seed words");
+        let path = seed_words_path(dir.path());
+        assert!(path.exists(), "seed_words.txt should be created on disk");
+        let on_disk = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(on_disk.trim(), words);
+    }
+
+    #[test]
+    fn reads_existing_seed_words_file() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = seed_words_path(dir.path());
+        let expected = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+        std::fs::write(&path, expected).unwrap();
+        let words = load_or_create_seed_words(dir.path()).unwrap();
+        assert_eq!(words, expected);
+    }
+
+    // ── seed_words_path ──────────────────────────────────────────────
+
+    #[test]
+    fn seed_words_path_is_under_data_dir() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = seed_words_path(dir.path());
+        assert!(path.to_string_lossy().contains("seed_words.txt"));
+        assert!(path.starts_with(dir.path()));
+    }
+}
+
