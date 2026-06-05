@@ -5,7 +5,13 @@ edition = "2021"
 
 [features]
 default = []
-library_wallet = ["dep:minotari_wallet"]
+library_wallet = [
+    "dep:minotari_wallet",
+    "dep:tari_shutdown",
+    "dep:tari_comms",
+    "dep:tari_p2p",
+    "dep:url",
+]
 
 [dependencies]
 tokio = { version = "=1.48.0", features = ["full"] }
@@ -26,6 +32,10 @@ tari_common_types = "=5.3.1"
 tari_transaction_components = "=5.3.1"
 tempfile = "=3.27.0"
 minotari_wallet = { version = "=5.3.1", optional = true, default-features = true }
+tari_shutdown = { version = "=5.3.1", optional = true }
+tari_comms = { version = "=5.3.1", optional = true }
+tari_p2p = { version = "=5.3.1", optional = true }
+url = { version = "2", optional = true }
 
 [dev-dependencies]
 pretty_assertions = "1"
