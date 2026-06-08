@@ -35,7 +35,6 @@ async fn run_old_wallet_scenarios(
 ) -> Vec<ScenarioResult> {
     let mut scenarios = Vec::new();
 
-    // B0: scan_from_genesis handles the full stop/reset/start lifecycle internally.
     scenarios.push(match run_b0(old_wallet).await {
         Ok(s) => s,
         Err(e) => scenario_error_result("B0", e.to_string()),
@@ -55,13 +54,11 @@ async fn run_old_wallet_scenarios(
     });
     let post_s1_balance = old_wallet.get_balance().await.unwrap_or(0);
 
-    // S2: scan_from_genesis handles the full lifecycle internally.
     scenarios.push(match run_s2(old_wallet, post_s1_balance).await {
         Ok(s) => s,
         Err(e) => scenario_error_result("S2", e.to_string()),
     });
 
-    // S3: scan_from_birthday handles the full lifecycle internally.
     scenarios.push(
         match run_s3(old_wallet, h_birth, post_s1_balance).await {
             Ok(s) => s,
@@ -79,13 +76,11 @@ async fn run_old_wallet_scenarios(
     });
     let post_s5_balance = old_wallet.get_balance().await.unwrap_or(0);
 
-    // S6: scan_from_genesis handles the full lifecycle internally.
     scenarios.push(match run_s6(old_wallet, post_s5_balance).await {
         Ok(s) => s,
         Err(e) => scenario_error_result("S6", e.to_string()),
     });
 
-    // S7: scan_from_birthday handles the full lifecycle internally.
     scenarios.push(
         match run_s7(old_wallet, h_birth, post_s5_balance).await {
             Ok(s) => s,
@@ -105,12 +100,12 @@ async fn print_old_wallet_address(old_wallet: &OldWalletDriver) {
 
 async fn print_all_wallet_addresses(config: &Config, use_library_wallet: bool) -> anyhow::Result<()> {
     let old_wallet = OldWalletDriver::new(
-        require_nonempty_path("wallet_bin_path", &config.wallet_bin_path)?,
-        require_nonempty_path("old_wallet_data_dir", &config.old_wallet_data_dir)?,
-        config.old_wallet_password.clone(),
-        config.grpc_port,
-        config.base_node_http_url.clone(),
-        config.c_min,
+        require_nonempty_path("wallet_bin", &config.paths.wallet_bin)?,
+        require_nonempty_path("old_wallet", &config.data.old_wallet)?,
+        config.passwords.old_wallet.clone(),
+        config.network.grpc_port,
+        config.network.base_node_http_url.clone(),
+        config.benchmark.c_min,
     )?;
     old_wallet.start().await?;
     let old_wallet_result = old_wallet.get_self_address().await;
@@ -121,11 +116,11 @@ async fn print_all_wallet_addresses(config: &Config, use_library_wallet: bool) -
         #[cfg(feature = "library_wallet")]
         {
             let library_wallet = LibraryWalletDriver::new(
-                require_nonempty_path("minotari_bin_path", &config.minotari_bin_path)?,
-                require_nonempty_path("new_wallet_data_dir", &config.new_wallet_data_dir)?,
-                config.base_node_http_url.clone(),
-                config.c_min,
-                config.new_wallet_password.clone(),
+                require_nonempty_path("minotari_bin", &config.paths.minotari_bin)?,
+                require_nonempty_path("new_wallet", &config.data.new_wallet)?,
+                config.network.base_node_http_url.clone(),
+                config.benchmark.c_min,
+                config.passwords.library_wallet.clone(),
             )?;
             println!("library_wallet: {}", library_wallet.get_self_address().await?);
         }
@@ -136,29 +131,29 @@ async fn print_all_wallet_addresses(config: &Config, use_library_wallet: bool) -
         }
     } else {
         let new_wallet = NewWalletDriver::new(
-            require_nonempty_path("minotari_bin_path", &config.minotari_bin_path)?,
-            require_nonempty_path("new_wallet_data_dir", &config.new_wallet_data_dir)?,
-            config.base_node_http_url.clone(),
-            config.c_min,
-            config.new_wallet_password.clone(),
+            require_nonempty_path("minotari_bin", &config.paths.minotari_bin)?,
+            require_nonempty_path("new_wallet", &config.data.new_wallet)?,
+            config.network.base_node_http_url.clone(),
+            config.benchmark.c_min,
+            config.passwords.new_wallet.clone(),
         )?;
         println!("new_wallet: {}", new_wallet.get_self_address().await?);
     }
 
     let payment_processor = PaymentProcessorDriver::new(
         require_nonempty_path(
-            "payment_processor_bin_path",
-            &config.payment_processor_bin_path,
+            "payment_processor_bin",
+            &config.paths.payment_processor_bin,
         )?,
         require_nonempty_path(
-            "payment_processor_data_dir",
-            &config.payment_processor_data_dir,
+            "payment_processor",
+            &config.data.payment_processor,
         )?,
-        require_nonempty_path("minotari_bin_path", &config.minotari_bin_path)?,
-        require_nonempty_path("wallet_bin_path", &config.wallet_bin_path)?,
-        config.base_node_http_url.clone(),
-        config.c_min,
-        config.payment_processor_password.clone(),
+        require_nonempty_path("minotari_bin", &config.paths.minotari_bin)?,
+        require_nonempty_path("console_wallet_bin", &config.paths.console_wallet_bin)?,
+        config.network.base_node_http_url.clone(),
+        config.benchmark.c_min,
+        config.passwords.payment_processor.clone(),
     )?;
     println!(
         "payment_processor: {}",
@@ -222,8 +217,8 @@ fn build_report(
         .iter()
         .find(|scenario| scenario.scenario_name == "S5")
         .and_then(|scenario| {
-            let num_batch_txs = (config.s5_m / config.s5_k.max(1)) as usize;
-            let num_individual_txs = config.s5_m as usize;
+            let num_batch_txs = (config.benchmark.s5_m / config.benchmark.s5_k.max(1)) as usize;
+            let num_individual_txs = config.benchmark.s5_m as usize;
             if scenario.tx_metrics.len() < num_batch_txs + num_individual_txs || num_batch_txs == 0
             {
                 return None;
@@ -245,9 +240,9 @@ fn build_report(
         os,
         disk_type: "unknown".to_string(),
         network_path,
-        console_wallet_version: config.console_wallet_version.clone(),
-        minotari_cli_version: config.minotari_cli_version.clone(),
-        base_node_version: config.base_node_version.clone(),
+        console_wallet_version: config.versions.console_wallet.clone(),
+        minotari_cli_version: config.versions.minotari_cli.clone(),
+        base_node_version: config.versions.base_node.clone(),
         scan_delta_s2_minus_b0,
         scan_delta_s6_minus_s2,
         s5_throughput_multiplier,
@@ -259,17 +254,17 @@ fn build_report(
 
 async fn run_new_wallet(config: &Config) -> (String, Vec<ScenarioResult>) {
     let new_wallet = NewWalletDriver::new(
-        require_nonempty_path("minotari_bin_path", &config.minotari_bin_path).unwrap_or_else(|e| {
+        require_nonempty_path("minotari_bin", &config.paths.minotari_bin).unwrap_or_else(|e| {
             eprintln!("new_wallet: {e}");
             std::process::exit(1);
         }),
-        require_nonempty_path("new_wallet_data_dir", &config.new_wallet_data_dir).unwrap_or_else(|e| {
+        require_nonempty_path("new_wallet", &config.data.new_wallet).unwrap_or_else(|e| {
             eprintln!("new_wallet: {e}");
             std::process::exit(1);
         }),
-        config.base_node_http_url.clone(),
-        config.c_min,
-        config.new_wallet_password.clone(),
+        config.network.base_node_http_url.clone(),
+        config.benchmark.c_min,
+        config.passwords.new_wallet.clone(),
     );
     match new_wallet {
         Ok(new_wallet) => {
@@ -293,17 +288,17 @@ async fn run_new_wallet(config: &Config) -> (String, Vec<ScenarioResult>) {
 #[cfg(feature = "library_wallet")]
 async fn run_library_wallet(config: &Config) -> (String, Vec<ScenarioResult>) {
     let library_wallet = LibraryWalletDriver::new(
-        require_nonempty_path("minotari_bin_path", &config.minotari_bin_path).unwrap_or_else(|e| {
+        require_nonempty_path("minotari_bin", &config.paths.minotari_bin).unwrap_or_else(|e| {
             eprintln!("library_wallet: {e}");
             std::process::exit(1);
         }),
-        require_nonempty_path("new_wallet_data_dir", &config.new_wallet_data_dir).unwrap_or_else(|e| {
+        require_nonempty_path("new_wallet", &config.data.new_wallet).unwrap_or_else(|e| {
             eprintln!("library_wallet: {e}");
             std::process::exit(1);
         }),
-        config.base_node_http_url.clone(),
-        config.c_min,
-        config.new_wallet_password.clone(),
+        config.network.base_node_http_url.clone(),
+        config.benchmark.c_min,
+        config.passwords.library_wallet.clone(),
     );
     match library_wallet {
         Ok(library_wallet) => {
@@ -325,7 +320,7 @@ async fn run_library_wallet(config: &Config) -> (String, Vec<ScenarioResult>) {
 }
 
 #[cfg(not(feature = "library_wallet"))]
-async fn run_library_wallet(_config: &Config) -> (String, Vec<ScenarioResult>) {
+async fn run_library_wallet(_config: &Config) -> (String, Vec::<ScenarioResult>) {
     eprintln!("--library-wallet flag requires the library_wallet feature: cargo check --features library_wallet");
     ("library_wallet".to_string(), vec![])
 }
@@ -369,19 +364,19 @@ async fn main() -> anyhow::Result<()> {
     let mut reports = Vec::new();
 
     let old_wallet = OldWalletDriver::new(
-        require_nonempty_path("wallet_bin_path", &config.wallet_bin_path)?,
-        require_nonempty_path("old_wallet_data_dir", &config.old_wallet_data_dir)?,
-        config.old_wallet_password.clone(),
-        config.grpc_port,
-        config.base_node_http_url.clone(),
-        config.c_min,
+        require_nonempty_path("wallet_bin", &config.paths.wallet_bin)?,
+        require_nonempty_path("old_wallet", &config.data.old_wallet)?,
+        config.passwords.old_wallet.clone(),
+        config.network.grpc_port,
+        config.network.base_node_http_url.clone(),
+        config.benchmark.c_min,
     )?;
     let old_wallet_scenarios = run_old_wallet_scenarios(&old_wallet, &config).await;
     reports.push(build_report(
         cpu_model.clone(),
         ram_kb,
         os.clone(),
-        format!("remote:{}", config.base_node_grpc_url),
+        format!("remote:{}", config.network.base_node_grpc_url),
         old_wallet.mode_name().to_string(),
         config_snapshot.clone(),
         old_wallet_scenarios,
@@ -397,7 +392,7 @@ async fn main() -> anyhow::Result<()> {
         cpu_model.clone(),
         ram_kb,
         os.clone(),
-        format!("remote:{}", config.base_node_grpc_url),
+        format!("remote:{}", config.network.base_node_grpc_url),
         new_wallet_mode_name,
         config_snapshot.clone(),
         new_wallet_scenarios,
@@ -407,18 +402,18 @@ async fn main() -> anyhow::Result<()> {
     let (payment_processor_mode_name, payment_processor_scenarios) =
         match PaymentProcessorDriver::new(
             require_nonempty_path(
-                "payment_processor_bin_path",
-                &config.payment_processor_bin_path,
+                "payment_processor_bin",
+                &config.paths.payment_processor_bin,
             )?,
             require_nonempty_path(
-                "payment_processor_data_dir",
-                &config.payment_processor_data_dir,
+                "payment_processor",
+                &config.data.payment_processor,
             )?,
-            require_nonempty_path("minotari_bin_path", &config.minotari_bin_path)?,
-            require_nonempty_path("wallet_bin_path", &config.wallet_bin_path)?,
-            config.base_node_http_url.clone(),
-            config.c_min,
-            config.payment_processor_password.clone(),
+            require_nonempty_path("minotari_bin", &config.paths.minotari_bin)?,
+            require_nonempty_path("console_wallet_bin", &config.paths.console_wallet_bin)?,
+            config.network.base_node_http_url.clone(),
+            config.benchmark.c_min,
+            config.passwords.payment_processor.clone(),
         ) {
             Ok(mut pp) => match pp.start_daemon().await {
                 Ok(()) => {
@@ -447,7 +442,7 @@ async fn main() -> anyhow::Result<()> {
         cpu_model,
         ram_kb,
         os,
-        format!("remote:{}", config.base_node_grpc_url),
+        format!("remote:{}", config.network.base_node_grpc_url),
         payment_processor_mode_name,
         config_snapshot,
         payment_processor_scenarios,

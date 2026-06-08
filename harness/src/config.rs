@@ -2,6 +2,16 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
+    pub benchmark: BenchmarkParams,
+    pub paths: BinaryPaths,
+    pub network: NetworkConfig,
+    pub passwords: Passwords,
+    pub data: DataDirs,
+    pub versions: VersionPins,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct BenchmarkParams {
     pub a_fund: u64,
     pub c_min: u64,
     pub volume_target: u64,
@@ -13,21 +23,44 @@ pub struct Config {
     pub s5_k: u64,
     pub tx_amount_ut: u64,
     pub fee_rate: String,
+    pub scan_interval_secs: u64,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct BinaryPaths {
+    pub wallet_bin: String,
+    pub minotari_bin: String,
+    pub payment_processor_bin: String,
+    pub console_wallet_bin: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct NetworkConfig {
     pub base_node_grpc_url: String,
     pub base_node_http_url: String,
-    pub console_wallet_version: String,
-    pub minotari_cli_version: String,
-    pub base_node_version: String,
-    pub wallet_bin_path: String,
-    pub minotari_bin_path: String,
-    pub payment_processor_bin_path: String,
-    pub old_wallet_password: String,
-    pub new_wallet_password: String,
-    pub payment_processor_password: String,
-    pub old_wallet_data_dir: String,
-    pub new_wallet_data_dir: String,
-    pub payment_processor_data_dir: String,
     pub grpc_port: u16,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Passwords {
+    pub old_wallet: String,
+    pub new_wallet: String,
+    pub payment_processor: String,
+    pub library_wallet: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct DataDirs {
+    pub old_wallet: String,
+    pub new_wallet: String,
+    pub payment_processor: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct VersionPins {
+    pub console_wallet: String,
+    pub minotari_cli: String,
+    pub base_node: String,
 }
 
 #[cfg(test)]
@@ -36,6 +69,7 @@ mod tests {
 
     fn sample_toml() -> &'static str {
         r#"
+[benchmark]
 a_fund = 3000000000000
 c_min = 4
 volume_target = 512
@@ -47,21 +81,34 @@ s5_m = 12
 s5_k = 4
 tx_amount_ut = 1000
 fee_rate = "2"
+scan_interval_secs = 1
+
+[paths]
+wallet_bin = "/usr/bin/minotari_console_wallet"
+minotari_bin = "/usr/bin/minotari"
+payment_processor_bin = "/usr/bin/minotari_payment_processor"
+console_wallet_bin = "/usr/bin/minotari_console_wallet"
+
+[network]
 base_node_grpc_url = "grpc://localhost:18142"
 base_node_http_url = "http://localhost:18143"
-console_wallet_version = "1.0.0"
-minotari_cli_version = "1.0.0"
-base_node_version = "1.0.0"
-wallet_bin_path = "/usr/bin/minotari_console_wallet"
-minotari_bin_path = "/usr/bin/minotari"
-payment_processor_bin_path = "/usr/bin/minotari_payment_processor"
-old_wallet_password = "test"
-new_wallet_password = "test"
-payment_processor_password = "test"
-old_wallet_data_dir = "/tmp/old"
-new_wallet_data_dir = "/tmp/new"
-payment_processor_data_dir = "/tmp/pp"
 grpc_port = 18142
+
+[passwords]
+old_wallet = "test"
+new_wallet = "test"
+payment_processor = "test"
+library_wallet = "test"
+
+[data]
+old_wallet = "/tmp/old"
+new_wallet = "/tmp/new"
+payment_processor = "/tmp/pp"
+
+[versions]
+console_wallet = "1.0.0"
+minotari_cli = "1.0.0"
+base_node = "1.0.0"
 "#
     }
 
@@ -73,20 +120,35 @@ grpc_port = 18142
     #[test]
     fn loads_full_config() {
         let c = parse(sample_toml());
-        assert_eq!(c.a_fund, 3_000_000_000_000);
-        assert_eq!(c.c_min, 4);
-        assert_eq!(c.volume_target, 512);
-        assert_eq!(c.doubling_rounds, 6);
-        assert_eq!(c.fanout_outputs_per_tx, 3);
-        assert_eq!(c.concurrent_batches, Vec::<u64>::new());
-        assert_eq!(c.s4_t_budget_secs, 120);
-        assert_eq!(c.s5_m, 12);
-        assert_eq!(c.s5_k, 4);
-        assert_eq!(c.tx_amount_ut, 1000);
-        assert_eq!(c.fee_rate, "2");
-        assert_eq!(c.base_node_grpc_url, "grpc://localhost:18142");
-        assert_eq!(c.base_node_http_url, "http://localhost:18143");
-        assert_eq!(c.grpc_port, 18142);
+        assert_eq!(c.benchmark.a_fund, 3_000_000_000_000);
+        assert_eq!(c.benchmark.c_min, 4);
+        assert_eq!(c.benchmark.volume_target, 512);
+        assert_eq!(c.benchmark.doubling_rounds, 6);
+        assert_eq!(c.benchmark.fanout_outputs_per_tx, 3);
+        assert_eq!(c.benchmark.concurrent_batches, Vec::<u64>::new());
+        assert_eq!(c.benchmark.s4_t_budget_secs, 120);
+        assert_eq!(c.benchmark.s5_m, 12);
+        assert_eq!(c.benchmark.s5_k, 4);
+        assert_eq!(c.benchmark.tx_amount_ut, 1000);
+        assert_eq!(c.benchmark.fee_rate, "2");
+        assert_eq!(c.benchmark.scan_interval_secs, 1);
+        assert_eq!(c.network.base_node_grpc_url, "grpc://localhost:18142");
+        assert_eq!(c.network.base_node_http_url, "http://localhost:18143");
+        assert_eq!(c.network.grpc_port, 18142);
+        assert_eq!(c.passwords.old_wallet, "test");
+        assert_eq!(c.passwords.new_wallet, "test");
+        assert_eq!(c.passwords.payment_processor, "test");
+        assert_eq!(c.passwords.library_wallet, "test");
+        assert_eq!(c.paths.wallet_bin, "/usr/bin/minotari_console_wallet");
+        assert_eq!(c.paths.minotari_bin, "/usr/bin/minotari");
+        assert_eq!(c.paths.payment_processor_bin, "/usr/bin/minotari_payment_processor");
+        assert_eq!(c.paths.console_wallet_bin, "/usr/bin/minotari_console_wallet");
+        assert_eq!(c.data.old_wallet, "/tmp/old");
+        assert_eq!(c.data.new_wallet, "/tmp/new");
+        assert_eq!(c.data.payment_processor, "/tmp/pp");
+        assert_eq!(c.versions.console_wallet, "1.0.0");
+        assert_eq!(c.versions.minotari_cli, "1.0.0");
+        assert_eq!(c.versions.base_node, "1.0.0");
     }
 
     #[test]
@@ -94,7 +156,7 @@ grpc_port = 18142
         let r: Result<Config, _> = toml::from_str("");
         assert!(r.is_err(), "empty TOML should fail without Default impl");
 
-        let r: Result<Config, _> = toml::from_str("a_fund = 1");
+        let r: Result<Config, _> = toml::from_str("[benchmark]\na_fund = 1");
         assert!(r.is_err(), "partial TOML should fail");
     }
 
@@ -118,12 +180,20 @@ grpc_port = 18142
             .replace("s5_m = 12", "s5_m = 0")
             .replace("s5_k = 4", "s5_k = 0")
             .replace("tx_amount_ut = 1000", "tx_amount_ut = 0")
+            .replace("scan_interval_secs = 1", "scan_interval_secs = 0")
             .replace("grpc_port = 18142", "grpc_port = 0");
         let c = parse(&toml);
-        assert_eq!(c.a_fund, 0);
-        assert_eq!(c.c_min, 0);
-        assert_eq!(c.grpc_port, 0);
-        assert_eq!(c.s5_m, 0);
+        assert_eq!(c.benchmark.a_fund, 0);
+        assert_eq!(c.benchmark.c_min, 0);
+        assert_eq!(c.benchmark.volume_target, 0);
+        assert_eq!(c.benchmark.doubling_rounds, 0);
+        assert_eq!(c.benchmark.fanout_outputs_per_tx, 0);
+        assert_eq!(c.benchmark.s4_t_budget_secs, 0);
+        assert_eq!(c.benchmark.s5_m, 0);
+        assert_eq!(c.benchmark.s5_k, 0);
+        assert_eq!(c.benchmark.tx_amount_ut, 0);
+        assert_eq!(c.benchmark.scan_interval_secs, 0);
+        assert_eq!(c.network.grpc_port, 0);
     }
 
     #[test]
@@ -136,21 +206,22 @@ grpc_port = 18142
             .replace("\"/usr/bin/minotari\"", "\"\"")
             .replace("\"/usr/bin/minotari_payment_processor\"", "\"\"");
         let c = parse(&toml);
-        assert_eq!(c.fee_rate, "");
-        assert_eq!(c.wallet_bin_path, "");
+        assert_eq!(c.benchmark.fee_rate, "");
+        assert_eq!(c.paths.wallet_bin, "");
+        assert_eq!(c.paths.minotari_bin, "");
     }
 
     #[test]
     fn accepts_empty_concurrent_batches() {
         let c = parse(sample_toml());
-        assert!(c.concurrent_batches.is_empty());
+        assert!(c.benchmark.concurrent_batches.is_empty());
     }
 
     #[test]
     fn accepts_populated_concurrent_batches() {
         let toml = sample_toml().replace("concurrent_batches = []", "concurrent_batches = [8, 16, 32]");
         let c = parse(&toml);
-        assert_eq!(c.concurrent_batches, vec![8, 16, 32]);
+        assert_eq!(c.benchmark.concurrent_batches, vec![8, 16, 32]);
     }
 
     // ── proptest: config round-trip ──────────────────────────────────
@@ -177,25 +248,40 @@ grpc_port = 18142
             grpc_port in 0u16..65535u16,
         ) -> Config {
             Config {
-                a_fund, c_min, volume_target, doubling_rounds,
-                fanout_outputs_per_tx, concurrent_batches,
-                s4_t_budget_secs, s5_m, s5_k, tx_amount_ut,
-                fee_rate,
-                base_node_grpc_url: String::new(),
-                base_node_http_url: String::new(),
-                console_wallet_version: String::new(),
-                minotari_cli_version: String::new(),
-                base_node_version: String::new(),
-                wallet_bin_path: String::new(),
-                minotari_bin_path: String::new(),
-                payment_processor_bin_path: String::new(),
-                old_wallet_password: String::new(),
-                new_wallet_password: String::new(),
-                payment_processor_password: String::new(),
-                old_wallet_data_dir: String::new(),
-                new_wallet_data_dir: String::new(),
-                payment_processor_data_dir: String::new(),
-                grpc_port,
+                benchmark: BenchmarkParams {
+                    a_fund, c_min, volume_target, doubling_rounds,
+                    fanout_outputs_per_tx, concurrent_batches,
+                    s4_t_budget_secs, s5_m, s5_k, tx_amount_ut,
+                    fee_rate,
+                    scan_interval_secs: 1,
+                },
+                paths: BinaryPaths {
+                    wallet_bin: String::new(),
+                    minotari_bin: String::new(),
+                    payment_processor_bin: String::new(),
+                    console_wallet_bin: String::new(),
+                },
+                network: NetworkConfig {
+                    base_node_grpc_url: String::new(),
+                    base_node_http_url: String::new(),
+                    grpc_port,
+                },
+                passwords: Passwords {
+                    old_wallet: String::new(),
+                    new_wallet: String::new(),
+                    payment_processor: String::new(),
+                    library_wallet: String::new(),
+                },
+                data: DataDirs {
+                    old_wallet: String::new(),
+                    new_wallet: String::new(),
+                    payment_processor: String::new(),
+                },
+                versions: VersionPins {
+                    console_wallet: String::new(),
+                    minotari_cli: String::new(),
+                    base_node: String::new(),
+                },
             }
         }
     }
@@ -205,19 +291,18 @@ grpc_port = 18142
         fn config_toml_round_trip(cfg in arbitrary_config()) {
             let serialized = toml::to_string(&cfg).unwrap();
             let deserialized: Config = toml::from_str(&serialized).unwrap();
-            assert_eq!(deserialized.a_fund, cfg.a_fund);
-            assert_eq!(deserialized.c_min, cfg.c_min);
-            assert_eq!(deserialized.volume_target, cfg.volume_target);
-            assert_eq!(deserialized.doubling_rounds, cfg.doubling_rounds);
-            assert_eq!(deserialized.fanout_outputs_per_tx, cfg.fanout_outputs_per_tx);
-            assert_eq!(deserialized.concurrent_batches, cfg.concurrent_batches);
-            assert_eq!(deserialized.s4_t_budget_secs, cfg.s4_t_budget_secs);
-            assert_eq!(deserialized.s5_m, cfg.s5_m);
-            assert_eq!(deserialized.s5_k, cfg.s5_k);
-            assert_eq!(deserialized.tx_amount_ut, cfg.tx_amount_ut);
-            assert_eq!(deserialized.fee_rate, cfg.fee_rate);
-            assert_eq!(deserialized.grpc_port, cfg.grpc_port);
+            assert_eq!(deserialized.benchmark.a_fund, cfg.benchmark.a_fund);
+            assert_eq!(deserialized.benchmark.c_min, cfg.benchmark.c_min);
+            assert_eq!(deserialized.benchmark.volume_target, cfg.benchmark.volume_target);
+            assert_eq!(deserialized.benchmark.doubling_rounds, cfg.benchmark.doubling_rounds);
+            assert_eq!(deserialized.benchmark.fanout_outputs_per_tx, cfg.benchmark.fanout_outputs_per_tx);
+            assert_eq!(deserialized.benchmark.concurrent_batches, cfg.benchmark.concurrent_batches);
+            assert_eq!(deserialized.benchmark.s4_t_budget_secs, cfg.benchmark.s4_t_budget_secs);
+            assert_eq!(deserialized.benchmark.s5_m, cfg.benchmark.s5_m);
+            assert_eq!(deserialized.benchmark.s5_k, cfg.benchmark.s5_k);
+            assert_eq!(deserialized.benchmark.tx_amount_ut, cfg.benchmark.tx_amount_ut);
+            assert_eq!(deserialized.benchmark.fee_rate, cfg.benchmark.fee_rate);
+            assert_eq!(deserialized.network.grpc_port, cfg.network.grpc_port);
         }
     }
 }
-

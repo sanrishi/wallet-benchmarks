@@ -3,3 +3,9 @@ Cargo.lock
 wallet-data/
 wallet-data-new/
 wallet-data-pp/
+
+# Binary artifacts
+*.exe
+*.dll
+*.pdb
+*.so

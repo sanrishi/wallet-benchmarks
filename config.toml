@@ -1,3 +1,4 @@
+[benchmark]
 a_fund = 300000000
 c_min = 3
 volume_target = 512
@@ -9,18 +10,31 @@ s5_m = 100
 s5_k = 10
 tx_amount_ut = 200
 fee_rate = "1"
+scan_interval_secs = 1
+
+[paths]
+wallet_bin = ""
+minotari_bin = ""
+payment_processor_bin = ""
+console_wallet_bin = ""
+
+[network]
 base_node_grpc_url = "http://rpc.esmeralda.tari.com:18142"
 base_node_http_url = "http://rpc.esmeralda.tari.com:18142"
-console_wallet_version = "set-me-to-exact-tag-or-commit"
-minotari_cli_version = "set-me-to-exact-tag-or-commit"
-base_node_version = "set-me-to-exact-tag-or-commit"
-wallet_bin_path = "./harness/minotari_console_wallet.exe"
-minotari_bin_path = ""
-payment_processor_bin_path = ""
-old_wallet_password = "benchmark123"
-new_wallet_password = "benchmark_mode2_password_32_chars"
-payment_processor_password = "benchmark_mode3_password_32_chars"
-old_wallet_data_dir = "./wallet-data"
-new_wallet_data_dir = "./wallet-data-new"
-payment_processor_data_dir = "./wallet-data-pp"
 grpc_port = 18143
+
+[passwords]
+old_wallet = "benchmark123"
+new_wallet = "benchmark_mode2_password_32_chars"
+payment_processor = "benchmark_mode3_password_32_chars"
+library_wallet = "benchmark_lib_password_32_chars"
+
+[data]
+old_wallet = "./wallet-data"
+new_wallet = "./wallet-data-new"
+payment_processor = "./wallet-data-pp"
+
+[versions]
+console_wallet = "set-me-to-exact-tag-or-commit"
+minotari_cli = "set-me-to-exact-tag-or-commit"
+base_node = "set-me-to-exact-tag-or-commit"

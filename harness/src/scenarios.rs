@@ -58,7 +58,7 @@ pub async fn run_b0(driver: &dyn WalletDriver) -> anyhow::Result<ScenarioResult>
 pub async fn run_s0(driver: &dyn WalletDriver, config: &Config) -> anyhow::Result<ScenarioResult> {
     let started_at = Instant::now();
     let h_birth = driver.get_tip_height().await?;
-    let funding_tx = match driver.observe_funding(config.a_fund).await {
+    let funding_tx = match driver.observe_funding(config.benchmark.a_fund).await {
         Ok(tx) => tx,
         Err(error) => TxMetrics {
             tx_id: "incoming-funding".to_string(),
@@ -73,7 +73,7 @@ pub async fn run_s0(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
     let observed_balance = driver.get_balance().await?;
     let tip_after = driver.get_tip_height().await?;
     let _ = (h_birth, tip_after);
-    let success = funding_tx.success && observed_balance >= config.a_fund;
+    let success = funding_tx.success && observed_balance >= config.benchmark.a_fund;
 
     Ok(ScenarioResult {
         scenario_name: "S0".to_string(),
@@ -81,7 +81,7 @@ pub async fn run_s0(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
         total_fees: 0,
         success_count: u64::from(success),
         failure_count: u64::from(!success),
-        balance_delta: config.a_fund as i64 - observed_balance as i64,
+        balance_delta: config.benchmark.a_fund as i64 - observed_balance as i64,
         tx_metrics: vec![funding_tx],
         scan_metrics: None,
         recorded_birth_height: Some(h_birth),
@@ -95,10 +95,10 @@ pub async fn run_s1(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
     let mut expected_balance = initial_balance;
     let mut tx_metrics = Vec::new();
     let fee_rate = parse_fee_rate(config);
-    let amount_per_tx = config.tx_amount_ut.max(1);
+    let amount_per_tx = config.benchmark.tx_amount_ut.max(1);
     let self_address = driver.get_self_address().await?;
 
-    for round in 0..config.doubling_rounds {
+    for round in 0..config.benchmark.doubling_rounds {
         let round_tx_count = 1_u64 << round;
         for _ in 0..round_tx_count {
             let recipients = vec![
@@ -125,13 +125,13 @@ pub async fn run_s1(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
         }
     }
 
-    let fanout_tx_count = if config.fanout_outputs_per_tx == 0 {
+    let fanout_tx_count = if config.benchmark.fanout_outputs_per_tx == 0 {
         0
     } else {
-        1_u64 << config.doubling_rounds
+        1_u64 << config.benchmark.doubling_rounds
     };
     for _ in 0..fanout_tx_count {
-        let recipients = (0..config.fanout_outputs_per_tx)
+        let recipients = (0..config.benchmark.fanout_outputs_per_tx)
             .map(|_| (self_address.clone(), amount_per_tx))
             .collect::<Vec<_>>();
         let tx = attempt_send_batch(driver, recipients.clone(), fee_rate).await;
@@ -227,17 +227,17 @@ pub async fn run_s4(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
     let mut expected_balance = initial_balance;
     let mut tx_metrics = Vec::new();
     let fee_rate = parse_fee_rate(config);
-    let per_tx_timeout = Duration::from_secs(config.s4_t_budget_secs);
+    let per_tx_timeout = Duration::from_secs(config.benchmark.s4_t_budget_secs);
     let self_address = driver.get_self_address().await?;
 
-    for batch_size in &config.concurrent_batches {
+    for batch_size in &config.benchmark.concurrent_batches {
         let futures = (0..*batch_size)
             .map(|_| {
                 let address = self_address.clone();
                 async move {
                     match tokio::time::timeout(
                         per_tx_timeout,
-                        driver.send_single(&address, config.tx_amount_ut.max(1), fee_rate),
+                        driver.send_single(&address, config.benchmark.tx_amount_ut.max(1), fee_rate),
                     )
                     .await
                     {
@@ -260,7 +260,7 @@ pub async fn run_s4(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
                             success: false,
                             error: Some(format!(
                                 "send_single timed out after {}s",
-                                config.s4_t_budget_secs
+                                config.benchmark.s4_t_budget_secs
                             )),
                         },
                     }
@@ -298,10 +298,10 @@ pub async fn run_s5(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
 
     match driver.mode_name() {
         "payment_processor" => {
-            let num_batch_txs = config.s5_m / config.s5_k.max(1);
+            let num_batch_txs = config.benchmark.s5_m / config.benchmark.s5_k.max(1);
             for _ in 0..num_batch_txs {
-                let recipients = (0..config.s5_k)
-                    .map(|_| (self_address.clone(), config.tx_amount_ut.max(1)))
+                let recipients = (0..config.benchmark.s5_k)
+                    .map(|_| (self_address.clone(), config.benchmark.tx_amount_ut.max(1)))
                     .collect::<Vec<_>>();
                 let tx = attempt_send_batch(driver, recipients, fee_rate).await;
                 if tx.success {
@@ -311,11 +311,11 @@ pub async fn run_s5(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
             }
         }
         _ => {
-            for _ in 0..config.s5_m {
+            for _ in 0..config.benchmark.s5_m {
                 let tx = attempt_send_single(
                     driver,
                     &self_address,
-                    config.tx_amount_ut.max(1),
+                    config.benchmark.tx_amount_ut.max(1),
                     fee_rate,
                 )
                 .await;
@@ -531,6 +531,7 @@ async fn wait_for_tip_height(
 
 fn parse_fee_rate(config: &Config) -> u64 {
     config
+        .benchmark
         .fee_rate
         .parse::<u64>()
         .expect("fee_rate in config must be a non-empty valid u64 integer")
@@ -539,6 +540,9 @@ fn parse_fee_rate(config: &Config) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::{
+        BenchmarkParams, BinaryPaths, DataDirs, NetworkConfig, Passwords, VersionPins,
+    };
     use async_trait::async_trait;
     use std::collections::VecDeque;
     use std::sync::{Arc, Mutex};
@@ -741,32 +745,47 @@ mod tests {
 
     fn sample_config() -> Config {
         Config {
-            a_fund: 10_000,
-            c_min: 3,
-            volume_target: 512,
-            doubling_rounds: 2,
-            fanout_outputs_per_tx: 3,
-            concurrent_batches: vec![2],
-            s4_t_budget_secs: 60,
-            s5_m: 12,
-            s5_k: 3,
-            tx_amount_ut: 200,
-            fee_rate: "1".to_string(),
-            base_node_grpc_url: String::new(),
-            base_node_http_url: String::new(),
-            console_wallet_version: String::new(),
-            minotari_cli_version: String::new(),
-            base_node_version: String::new(),
-            wallet_bin_path: String::new(),
-            minotari_bin_path: String::new(),
-            old_wallet_password: String::new(),
-            new_wallet_password: String::new(),
-            payment_processor_password: String::new(),
-            old_wallet_data_dir: String::new(),
-            new_wallet_data_dir: String::new(),
-            payment_processor_data_dir: String::new(),
-            grpc_port: 0,
-            payment_processor_bin_path: String::new(),
+            benchmark: BenchmarkParams {
+                a_fund: 10_000,
+                c_min: 3,
+                volume_target: 512,
+                doubling_rounds: 2,
+                fanout_outputs_per_tx: 3,
+                concurrent_batches: vec![2],
+                s4_t_budget_secs: 60,
+                s5_m: 12,
+                s5_k: 3,
+                tx_amount_ut: 200,
+                fee_rate: "1".to_string(),
+                scan_interval_secs: 1,
+            },
+            paths: BinaryPaths {
+                wallet_bin: String::new(),
+                minotari_bin: String::new(),
+                payment_processor_bin: String::new(),
+                console_wallet_bin: String::new(),
+            },
+            network: NetworkConfig {
+                base_node_grpc_url: String::new(),
+                base_node_http_url: String::new(),
+                grpc_port: 0,
+            },
+            passwords: Passwords {
+                old_wallet: String::new(),
+                new_wallet: String::new(),
+                payment_processor: String::new(),
+                library_wallet: String::new(),
+            },
+            data: DataDirs {
+                old_wallet: String::new(),
+                new_wallet: String::new(),
+                payment_processor: String::new(),
+            },
+            versions: VersionPins {
+                console_wallet: String::new(),
+                minotari_cli: String::new(),
+                base_node: String::new(),
+            },
         }
     }
 
@@ -885,8 +904,8 @@ mod tests {
     #[tokio::test]
     async fn s1_with_zero_doubling_rounds_skips_to_fanout() {
         let mut cfg = sample_config();
-        cfg.doubling_rounds = 0;
-        cfg.fanout_outputs_per_tx = 2;
+        cfg.benchmark.doubling_rounds = 0;
+        cfg.benchmark.fanout_outputs_per_tx = 2;
         let driver = FakeDriver::new().with_balances(VecDeque::from([10_000, 10_000]));
         let result = run_s1(&driver, &cfg).await.unwrap();
         let state = driver.state.lock().unwrap();
@@ -899,8 +918,8 @@ mod tests {
     #[tokio::test]
     async fn s1_with_zero_fanout_skips_fanout_entirely() {
         let mut cfg = sample_config();
-        cfg.doubling_rounds = 1;
-        cfg.fanout_outputs_per_tx = 0;
+        cfg.benchmark.doubling_rounds = 1;
+        cfg.benchmark.fanout_outputs_per_tx = 0;
         let driver = FakeDriver::new().with_balances(VecDeque::from([10_000, 10_000]));
         let result = run_s1(&driver, &cfg).await.unwrap();
         let state = driver.state.lock().unwrap();
@@ -925,7 +944,7 @@ mod tests {
     #[tokio::test]
     async fn s4_with_empty_concurrent_batches_produces_no_tx() {
         let mut cfg = sample_config();
-        cfg.concurrent_batches = vec![];
+        cfg.benchmark.concurrent_batches = vec![];
         let driver = FakeDriver::new().with_balances(VecDeque::from([10_000]));
         let result = run_s4(&driver, &cfg).await.unwrap();
 
@@ -936,7 +955,7 @@ mod tests {
     #[tokio::test]
     async fn s4_runs_all_concurrent_batches() {
         let mut cfg = sample_config();
-        cfg.concurrent_batches = vec![3, 5];
+        cfg.benchmark.concurrent_batches = vec![3, 5];
         let driver = FakeDriver::new()
             .with_balances(VecDeque::from([10_000]))
             .with_tip_height(200);
@@ -952,8 +971,8 @@ mod tests {
     #[tokio::test]
     async fn s5_with_zero_s5k_uses_single_arm_only() {
         let mut cfg = sample_config();
-        cfg.s5_m = 6;
-        cfg.s5_k = 0;
+        cfg.benchmark.s5_m = 6;
+        cfg.benchmark.s5_k = 0;
         let driver = FakeDriver::new()
             .with_balances(VecDeque::from([10_000, 10_000]))
             .with_mode_name("old_wallet");
