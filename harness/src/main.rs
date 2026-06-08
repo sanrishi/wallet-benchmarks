@@ -106,6 +106,7 @@ async fn print_all_wallet_addresses(config: &Config, use_library_wallet: bool) -
         config.network.grpc_port,
         config.network.base_node_http_url.clone(),
         config.benchmark.c_min,
+        config_seed_for(config, "old_wallet"),
     )?;
     old_wallet.start().await?;
     let old_wallet_result = old_wallet.get_self_address().await;
@@ -121,6 +122,7 @@ async fn print_all_wallet_addresses(config: &Config, use_library_wallet: bool) -
                 config.network.base_node_http_url.clone(),
                 config.benchmark.c_min,
                 config.passwords.library_wallet.clone(),
+                config_seed_for(config, "library_wallet"),
             )?;
             println!("library_wallet: {}", library_wallet.get_self_address().await?);
         }
@@ -136,6 +138,7 @@ async fn print_all_wallet_addresses(config: &Config, use_library_wallet: bool) -
             config.network.base_node_http_url.clone(),
             config.benchmark.c_min,
             config.passwords.new_wallet.clone(),
+            config_seed_for(config, "new_wallet"),
         )?;
         println!("new_wallet: {}", new_wallet.get_self_address().await?);
     }
@@ -154,6 +157,7 @@ async fn print_all_wallet_addresses(config: &Config, use_library_wallet: bool) -
         config.network.base_node_http_url.clone(),
         config.benchmark.c_min,
         config.passwords.payment_processor.clone(),
+        config_seed_for(config, "payment_processor"),
     )?;
     println!(
         "payment_processor: {}",
@@ -169,6 +173,16 @@ fn require_nonempty_path(label: &str, value: &str) -> anyhow::Result<PathBuf> {
         return Err(anyhow::anyhow!("{label} must not be empty"));
     }
     Ok(PathBuf::from(trimmed))
+}
+
+fn config_seed_for(config: &Config, mode: &str) -> Option<String> {
+    config.seeds.as_ref().and_then(|s| match mode {
+        "old_wallet" => s.old_wallet.clone(),
+        "new_wallet" => s.new_wallet.clone(),
+        "payment_processor" => s.payment_processor.clone(),
+        "library_wallet" => s.library_wallet.clone(),
+        _ => None,
+    })
 }
 
 fn scan_duration(scenarios: &[ScenarioResult], name: &str) -> Option<f64> {
@@ -217,7 +231,11 @@ fn build_report(
         .iter()
         .find(|scenario| scenario.scenario_name == "S5")
         .and_then(|scenario| {
-            let num_batch_txs = (config.benchmark.s5_m / config.benchmark.s5_k.max(1)) as usize;
+            let num_batch_txs = if config.benchmark.s5_k > 0 {
+                (config.benchmark.s5_m / config.benchmark.s5_k) as usize
+            } else {
+                0
+            };
             let num_individual_txs = config.benchmark.s5_m as usize;
             if scenario.tx_metrics.len() < num_batch_txs + num_individual_txs || num_batch_txs == 0
             {
@@ -253,19 +271,16 @@ fn build_report(
 }
 
 async fn run_new_wallet(config: &Config) -> (String, Vec<ScenarioResult>) {
-    let new_wallet = NewWalletDriver::new(
-        require_nonempty_path("minotari_bin", &config.paths.minotari_bin).unwrap_or_else(|e| {
-            eprintln!("new_wallet: {e}");
-            std::process::exit(1);
-        }),
-        require_nonempty_path("new_wallet", &config.data.new_wallet).unwrap_or_else(|e| {
-            eprintln!("new_wallet: {e}");
-            std::process::exit(1);
-        }),
-        config.network.base_node_http_url.clone(),
-        config.benchmark.c_min,
-        config.passwords.new_wallet.clone(),
-    );
+    let new_wallet = (|| -> anyhow::Result<NewWalletDriver> {
+        Ok(NewWalletDriver::new(
+            require_nonempty_path("minotari_bin", &config.paths.minotari_bin)?,
+            require_nonempty_path("new_wallet", &config.data.new_wallet)?,
+            config.network.base_node_http_url.clone(),
+            config.benchmark.c_min,
+            config.passwords.new_wallet.clone(),
+            config_seed_for(config, "new_wallet"),
+        )?)
+    })();
     match new_wallet {
         Ok(new_wallet) => {
             let mode_name = new_wallet.mode_name().to_string();
@@ -287,19 +302,16 @@ async fn run_new_wallet(config: &Config) -> (String, Vec<ScenarioResult>) {
 
 #[cfg(feature = "library_wallet")]
 async fn run_library_wallet(config: &Config) -> (String, Vec<ScenarioResult>) {
-    let library_wallet = LibraryWalletDriver::new(
-        require_nonempty_path("minotari_bin", &config.paths.minotari_bin).unwrap_or_else(|e| {
-            eprintln!("library_wallet: {e}");
-            std::process::exit(1);
-        }),
-        require_nonempty_path("new_wallet", &config.data.new_wallet).unwrap_or_else(|e| {
-            eprintln!("library_wallet: {e}");
-            std::process::exit(1);
-        }),
-        config.network.base_node_http_url.clone(),
-        config.benchmark.c_min,
-        config.passwords.library_wallet.clone(),
-    );
+    let library_wallet = (|| -> anyhow::Result<LibraryWalletDriver> {
+        Ok(LibraryWalletDriver::new(
+            require_nonempty_path("minotari_bin", &config.paths.minotari_bin)?,
+            require_nonempty_path("new_wallet", &config.data.new_wallet)?,
+            config.network.base_node_http_url.clone(),
+            config.benchmark.c_min,
+            config.passwords.library_wallet.clone(),
+            config_seed_for(config, "library_wallet"),
+        )?)
+    })();
     match library_wallet {
         Ok(library_wallet) => {
             let mode_name = library_wallet.mode_name().to_string();
@@ -370,6 +382,7 @@ async fn main() -> anyhow::Result<()> {
         config.network.grpc_port,
         config.network.base_node_http_url.clone(),
         config.benchmark.c_min,
+        config_seed_for(&config, "old_wallet"),
     )?;
     let old_wallet_scenarios = run_old_wallet_scenarios(&old_wallet, &config).await;
     reports.push(build_report(
@@ -414,6 +427,7 @@ async fn main() -> anyhow::Result<()> {
             config.network.base_node_http_url.clone(),
             config.benchmark.c_min,
             config.passwords.payment_processor.clone(),
+            config_seed_for(&config, "payment_processor"),
         ) {
             Ok(mut pp) => match pp.start_daemon().await {
                 Ok(()) => {

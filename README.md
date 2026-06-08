@@ -32,7 +32,7 @@ cargo build --release -p minotari_console_wallet -p minotari --bin minotari
 
 The binaries are at `target/release/minotari_console_wallet` and
 `target/release/minotari`.  Copy or symlink them to a convenient location and
-set `wallet_bin_path` / `minotari_bin_path` in `config.toml`.
+set `paths.wallet_bin` / `paths.minotari_bin` in `config.toml`.
 
 If you already have access to a synced Esmeralda base node (public or local),
 its gRPC port (default `18142`) is the `base_node_grpc_url`. The HTTP JSON-RPC
@@ -67,18 +67,24 @@ before running.**
 
 #### Required Paths
 
-| Setting | Example | Notes |
-|---|---|---|
-| `wallet_bin_path` | `"C:/tools/minotari_console_wallet.exe"` | Absolute or workspace-relative path to the old wallet binary |
-| `minotari_bin_path` | `"C:/tools/minotari.exe"` | Absolute or workspace-relative path to the `minotari` CLI binary |
-| `old_wallet_data_dir` | `"./wallet-data"` | Working directory for mode 1; **wiped** by scan scenarios |
-| `new_wallet_data_dir` | `"./wallet-data-new"` | Working directory for mode 2; **wiped** by scan scenarios |
-| `payment_processor_data_dir` | `"./wallet-data-pp"` | Working directory for mode 3; **wiped** by scan scenarios |
+All binary and data-directory settings go under `[paths]` and `[data]` sections:
+
+| Section | Setting | Example | Notes |
+|---|---|---|---|
+| `[paths]` | `wallet_bin` | `"C:/tools/minotari_console_wallet.exe"` | Absolute or workspace-relative path to the old wallet binary |
+| `[paths]` | `minotari_bin` | `"C:/tools/minotari.exe"` | Absolute or workspace-relative path to the `minotari` CLI binary |
+| `[paths]` | `payment_processor_bin` | `"C:/tools/minotari_payment_processor.exe"` | Path to the payment processor binary |
+| `[paths]` | `console_wallet_bin` | `"C:/tools/minotari_console_wallet.exe"` | Path used by payment processor mode |
+| `[data]` | `old_wallet` | `"./wallet-data"` | Working directory for mode 1; **wiped** by scan scenarios |
+| `[data]` | `new_wallet` | `"./wallet-data-new"` | Working directory for mode 2; **wiped** by scan scenarios |
+| `[data]` | `payment_processor` | `"./wallet-data-pp"` | Working directory for mode 3; **wiped** by scan scenarios |
 
 Use empty, throwaway directories. The harness resets wallet state as part of the
 benchmark protocol.
 
 #### Network Endpoints
+
+All network settings go under the `[network]` section:
 
 | Setting | Example | Notes |
 |---|---|---|
@@ -86,17 +92,17 @@ benchmark protocol.
 | `base_node_http_url` | `"http://rpc.esmeralda.tari.com:18142"` | Public or local base node HTTP endpoint |
 | `grpc_port` | `18143` | Local port for the spawned `minotari_console_wallet` gRPC server |
 
-#### Version Pins
+#### Version Pins (under `[versions]`)
 
 | Setting | Expected Value |
 |---|---|
-| `console_wallet_version` | The exact git tag or commit used to build `minotari_console_wallet` |
-| `minotari_cli_version` | The exact git tag or commit used to build the `minotari` CLI |
-| `base_node_version` | The exact git tag or commit of the base node you are connecting to |
+| `console_wallet` | The exact git tag or commit used to build `minotari_console_wallet` |
+| `minotari_cli` | The exact git tag or commit used to build the `minotari` CLI |
+| `base_node` | The exact git tag or commit of the base node you are connecting to |
 
 These are recorded verbatim in the report so reviewers know what was tested.
 
-#### Benchmark Parameters
+#### Benchmark Parameters (under `[benchmark]`)
 
 | Setting | Default | Purpose |
 |---|---|---|
@@ -109,16 +115,18 @@ These are recorded verbatim in the report so reviewers know what was tested.
 | `fanout_outputs_per_tx` | `8` | Recipients per fan-out batch transaction in `S1` |
 | `concurrent_batches` | `[8, 16, 32, 64, 128]` | Batch sizes for concurrent construction in `S4` |
 | `s4_t_budget_secs` | `900` | Per-transaction timeout for `S4` concurrent sends |
-| `s5_m` | `100` | Total transactions in `S5` (and per-arm count) |
+| `s5_m` | `100` | Total transactions per arm in `S5` |
 | `s5_k` | `10` | Recipients per batch transaction in `S5` batch arm |
+| `scan_interval_secs` | `1` | Seconds between scan-status polls during resync |
 
-#### Passwords
+#### Passwords (under `[passwords]`)
 
 | Setting | Notes |
 |---|---|
-| `old_wallet_password` | Passed to `minotari_console_wallet --password` |
-| `new_wallet_password` | Used for wallet DB encryption (mode 2) |
-| `payment_processor_password` | Used for wallet DB encryption (mode 3) |
+| `old_wallet` | Passed to `minotari_console_wallet --password` |
+| `new_wallet` | Used for wallet DB encryption (mode 2) |
+| `payment_processor` | Used for wallet DB encryption (mode 3) |
+| `library_wallet` | Used for wallet DB encryption if built with `--features library_wallet` |
 
 Mode 2 and mode 3 passwords must be at least 16 characters (the Tari CLI wallet
 enforces this).
@@ -177,7 +185,7 @@ unless the configuration itself is invalid.
 | `S2` | Full genesis re-scan after wipe; verifies recovered balance = post-`S1` | Post-`S1` balance |
 | `S3` | Birthday re-scan after wipe; same checkpoint as `S2` | Post-`S1` balance |
 | `S4` | Concurrent transaction construction at increasing batch sizes | — |
-| `S5` | Throughput comparison: batch (1-to-many) vs individual sends | Post-`S5` balance |
+| `S5` | Throughput comparison: batch (1-to-many) **and** individual sends run on every mode | Post-`S5` balance |
 | `S6` | Full genesis re-scan after wipe; verifies recovered balance = post-`S5` | Post-`S5` balance |
 | `S7` | Birthday re-scan after wipe; same checkpoint as `S6` | Post-`S5` balance |
 
@@ -242,7 +250,7 @@ The report is a JSON array, one element per mode:
 | `scenarios[].scan_metrics` | Scan resource usage including `peak_rss_kb` and `peak_cpu_percent` |
 | `scenarios[].error` | Scenario-level error string if the scenario failed to complete |
 | `scan_delta_s2_minus_b0` | How much slower (or faster) a genesis scan is after UTXO build-up vs baseline |
-| `s5_throughput_multiplier` | Ratio of individual-send throughput to batch-send throughput in S5 |
+| `s5_throughput_multiplier` | Ratio of individual-send throughput to batch-send throughput in S5 (both arms run on every mode) |
 
 ## Architecture
 
@@ -256,8 +264,11 @@ The report is a JSON array, one element per mode:
 
 ### Design Principles
 
-- **No harness-level retry, backoff, or throttling:** wallet pain points (lock
+- **No scenario-level retry, backoff, or throttling:** wallet pain points (lock
   contention, rejects, stalls, timeouts) are surfaced as results, not hidden.
+  (Driver internals may perform limited retries — e.g. port-conflict retry in
+  the new-wallet daemon, directory-lock retry in old-wallet reset — these are
+  infrastructure concerns that do not mask wallet behavior.)
 - **Real confirmation timing:** every transaction records how long it took to
   reach spendable depth—no hardcoded zeros.
 - **Scan checkpoint validation:** post-wipe scans verify their recovered balance
@@ -277,7 +288,7 @@ subcommands. Rebuild `minotari` from the tag specified in `config.toml`.
 ### Wallet gRPC did not become ready within 120s
 
 The `minotari_console_wallet` binary failed to start or connect to gRPC. Check:
-- The binary exists at `wallet_bin_path`
+- The binary exists at `paths.wallet_bin`
 - The `grpc_port` is not already in use
 - The base node gRPC endpoint is reachable
 - Run the binary manually to see its stderr output
@@ -291,7 +302,7 @@ The `minotari_console_wallet` binary failed to start or connect to gRPC. Check:
 ### "password must be at least 16 characters"
 
 Mode 2 and mode 3 passwords must be **16 characters or longer**. Update
-`new_wallet_password` and `payment_processor_password` in `config.toml`.
+`passwords.new_wallet` and `passwords.payment_processor` in `config.toml`.
 
 ### `baseline_profile.json` has `peak_rss_kb: 0` or `peak_cpu_percent: 0.0`
 
@@ -312,3 +323,16 @@ This is a known limitation of the polling-based approach. Longer scans (e.g.
   host-specific disk inspection.
 - Mode 2 and Mode 3 use `minotari` CLI subprocesses, not the wallet daemon.
   This is deliberate: it measures the user-facing CLI path, not a custom API.
+- **S4 concurrent construction** spawns up to `max(concurrent_batches)` daemon
+  instances simultaneously, all opening the same `wallet.db` (SQLite). Lock
+  contention magnifies failure rates at large batch sizes — this is partly a
+  harness artifact, not purely a wallet bottleneck. The results are still
+  meaningful for comparing modes under identical load, but absolute failure
+  counts should not be interpreted as pure wallet limits.
+- **Secret handling:** passwords and seed words are passed as `--password` /
+  `--seed-words` CLI arguments to subprocesses, making them visible to local
+  users via process listings. This is acceptable for testnet benchmarks but
+  should use stdin/env/file for production use.
+- **Seed words** are generated randomly on first run and persisted in the data
+  directory. For reproducible funding addresses across checkouts, the
+  `[seeds]` config section can be used to supply deterministic seed words.

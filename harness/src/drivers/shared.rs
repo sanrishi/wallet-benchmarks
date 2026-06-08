@@ -23,16 +23,33 @@ pub fn seed_words_path(data_dir: &std::path::Path) -> PathBuf {
 }
 
 /// Load existing seed words from disk, or generate and persist a fresh set.
-pub fn load_or_create_seed_words(data_dir: &std::path::Path) -> anyhow::Result<String> {
+///
+/// If `config_seed` is `Some`, it is used instead of generating a random seed,
+/// making funding addresses reproducible across checkouts. The provided seed
+/// is persisted to disk so subsequent runs are consistent even without the
+/// config entry.
+pub fn load_or_create_seed_words(
+    data_dir: &std::path::Path,
+    config_seed: Option<&str>,
+) -> anyhow::Result<String> {
     let words_path = seed_words_path(data_dir);
     match std::fs::read_to_string(&words_path) {
         Ok(seed_words) => Ok(seed_words.trim().to_string()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            let seed_words = CipherSeed::random()
-                .to_mnemonic(MnemonicLanguage::English, None)?
-                .join(" ")
-                .reveal()
-                .to_string();
+            let seed_words = if let Some(provided) = config_seed {
+                // Validate the provided seed is well-formed
+                let mnemonic =
+                    SeedWords::from_str(provided).context("invalid seed words in config")?;
+                CipherSeed::from_mnemonic(&mnemonic, None)
+                    .context("failed to reconstruct cipher seed from config")?;
+                provided.to_string()
+            } else {
+                CipherSeed::random()
+                    .to_mnemonic(MnemonicLanguage::English, None)?
+                    .join(" ")
+                    .reveal()
+                    .to_string()
+            };
             std::fs::write(&words_path, &seed_words)?;
             Ok(seed_words)
         }
@@ -67,9 +84,13 @@ pub fn parse_balance_output(stdout: &str) -> anyhow::Result<u64> {
         .next_back()
         .map(str::trim)
         .ok_or_else(|| anyhow::anyhow!("balance output did not contain a parsable amount"))?;
-    let amount = amount.replace(',', "").replace("ÂµT", "µT");
-    let amount = MicroMinotari::from_str(&amount)
-        .with_context(|| format!("failed to parse balance amount '{amount}'"))?;
+    let amount = amount.replace(',', "");
+    let amount = amount
+        .trim_end()
+        .trim_end_matches(|c: char| !c.is_ascii_digit() && c != '.' && c != ' ')
+        .trim();
+    let amount = MicroMinotari::from_str(amount)
+        .with_context(|| format!("failed to parse balance amount '{amount}' from line: '{line}'"))?;
     Ok(amount.as_u64())
 }
 
@@ -168,7 +189,7 @@ mod tests {
 
     #[test]
     fn seed_words_with_birthday_round_trip() {
-        let words = load_or_create_seed_words(&tempfile::TempDir::new().unwrap().path()).unwrap();
+        let words = load_or_create_seed_words(&tempfile::TempDir::new().unwrap().path(), None).unwrap();
         let modified = seed_words_with_birthday(&words, 42).unwrap();
         assert!(!modified.is_empty());
         assert_ne!(modified, words, "birthday should change the seed encoding");
@@ -176,7 +197,7 @@ mod tests {
 
     #[test]
     fn seed_words_with_birthday_genesis() {
-        let words = load_or_create_seed_words(&tempfile::TempDir::new().unwrap().path()).unwrap();
+        let words = load_or_create_seed_words(&tempfile::TempDir::new().unwrap().path(), None).unwrap();
         let genesis = seed_words_with_birthday(&words, 0).unwrap();
         assert!(!genesis.is_empty());
     }
@@ -191,7 +212,7 @@ mod tests {
     #[test]
     fn derive_wallet_keys_is_deterministic() {
         let dir = tempfile::TempDir::new().unwrap();
-        let words = load_or_create_seed_words(dir.path()).unwrap();
+        let words = load_or_create_seed_words(dir.path(), None).unwrap();
         let (vk1, sk1) = derive_wallet_keys(&words).unwrap();
         let (vk2, sk2) = derive_wallet_keys(&words).unwrap();
         assert_eq!(vk1, vk2, "view key must be deterministic");
@@ -201,7 +222,7 @@ mod tests {
     #[test]
     fn derive_wallet_keys_returns_non_empty_hex() {
         let dir = tempfile::TempDir::new().unwrap();
-        let words = load_or_create_seed_words(dir.path()).unwrap();
+        let words = load_or_create_seed_words(dir.path(), None).unwrap();
         let (view_key, spend_key) = derive_wallet_keys(&words).unwrap();
         assert!(!view_key.is_empty(), "view key hex should not be empty");
         assert!(!spend_key.is_empty(), "spend key hex should not be empty");
@@ -228,7 +249,7 @@ mod tests {
     #[test]
     fn creates_seed_words_file_when_missing() {
         let dir = tempfile::TempDir::new().unwrap();
-        let words = load_or_create_seed_words(dir.path()).unwrap();
+        let words = load_or_create_seed_words(dir.path(), None).unwrap();
         assert!(!words.is_empty(), "should generate new seed words");
         let path = seed_words_path(dir.path());
         assert!(path.exists(), "seed_words.txt should be created on disk");
@@ -242,7 +263,7 @@ mod tests {
         let path = seed_words_path(dir.path());
         let expected = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
         std::fs::write(&path, expected).unwrap();
-        let words = load_or_create_seed_words(dir.path()).unwrap();
+        let words = load_or_create_seed_words(dir.path(), None).unwrap();
         assert_eq!(words, expected);
     }
 
@@ -281,7 +302,7 @@ mod tests {
     #[test]
     fn seed_words_persist_across_directory_wipe() {
         let dir = tempfile::TempDir::new().unwrap();
-        let original = load_or_create_seed_words(dir.path()).unwrap();
+        let original = load_or_create_seed_words(dir.path(), None).unwrap();
 
         // Simulate wipe + restore: save seed words, delete dir, recreate
         let saved = original.clone();
@@ -289,20 +310,20 @@ mod tests {
         std::fs::create_dir_all(dir.path()).unwrap();
         std::fs::write(seed_words_path(dir.path()), &saved).unwrap();
 
-        let restored = load_or_create_seed_words(dir.path()).unwrap();
+        let restored = load_or_create_seed_words(dir.path(), None).unwrap();
         assert_eq!(restored, original, "seed words must survive directory wipe");
     }
 
     #[test]
     fn derive_wallet_keys_recovers_same_wallet_after_recovery() {
         let dir = tempfile::TempDir::new().unwrap();
-        let words = load_or_create_seed_words(dir.path()).unwrap();
+        let words = load_or_create_seed_words(dir.path(), None).unwrap();
 
         // Persist seed words, then recover to a new directory
         let saved_words = words.clone();
         let recovered_dir = tempfile::TempDir::new().unwrap();
         std::fs::write(seed_words_path(recovered_dir.path()), &saved_words).unwrap();
-        let recovered = load_or_create_seed_words(recovered_dir.path()).unwrap();
+        let recovered = load_or_create_seed_words(recovered_dir.path(), None).unwrap();
 
         let (vk1, sk1) = derive_wallet_keys(&words).unwrap();
         let (vk2, sk2) = derive_wallet_keys(&recovered).unwrap();
@@ -314,7 +335,7 @@ mod tests {
     #[test]
     fn seed_words_with_birthday_produces_different_output_for_different_birthdays() {
         let dir = tempfile::TempDir::new().unwrap();
-        let words = load_or_create_seed_words(dir.path()).unwrap();
+        let words = load_or_create_seed_words(dir.path(), None).unwrap();
 
         let b0 = seed_words_with_birthday(&words, 0).unwrap();
         let b1 = seed_words_with_birthday(&words, 10).unwrap();
@@ -328,7 +349,7 @@ mod tests {
     #[test]
     fn same_birthday_produces_same_seed_encoding() {
         let dir = tempfile::TempDir::new().unwrap();
-        let words = load_or_create_seed_words(dir.path()).unwrap();
+        let words = load_or_create_seed_words(dir.path(), None).unwrap();
 
         let a = seed_words_with_birthday(&words, 42).unwrap();
         let b = seed_words_with_birthday(&words, 42).unwrap();

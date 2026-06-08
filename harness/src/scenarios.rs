@@ -296,35 +296,32 @@ pub async fn run_s5(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
     let fee_rate = parse_fee_rate(config);
     let self_address = driver.get_self_address().await?;
 
-    match driver.mode_name() {
-        "payment_processor" => {
-            let num_batch_txs = config.benchmark.s5_m / config.benchmark.s5_k.max(1);
-            for _ in 0..num_batch_txs {
-                let recipients = (0..config.benchmark.s5_k)
-                    .map(|_| (self_address.clone(), config.benchmark.tx_amount_ut.max(1)))
-                    .collect::<Vec<_>>();
-                let tx = attempt_send_batch(driver, recipients, fee_rate).await;
-                if tx.success {
-                    expected_balance = expected_balance.saturating_sub(tx.fee_paid);
-                }
-                tx_metrics.push(tx);
+    if config.benchmark.s5_k > 0 {
+        let num_batch_txs = config.benchmark.s5_m / config.benchmark.s5_k;
+        for _ in 0..num_batch_txs {
+            let recipients = (0..config.benchmark.s5_k)
+                .map(|_| (self_address.clone(), config.benchmark.tx_amount_ut.max(1)))
+                .collect::<Vec<_>>();
+            let tx = attempt_send_batch(driver, recipients, fee_rate).await;
+            if tx.success {
+                expected_balance = expected_balance.saturating_sub(tx.fee_paid);
             }
+            tx_metrics.push(tx);
         }
-        _ => {
-            for _ in 0..config.benchmark.s5_m {
-                let tx = attempt_send_single(
-                    driver,
-                    &self_address,
-                    config.benchmark.tx_amount_ut.max(1),
-                    fee_rate,
-                )
-                .await;
-                if tx.success {
-                    expected_balance = expected_balance.saturating_sub(tx.fee_paid);
-                }
-                tx_metrics.push(tx);
-            }
+    }
+
+    for _ in 0..config.benchmark.s5_m {
+        let tx = attempt_send_single(
+            driver,
+            &self_address,
+            config.benchmark.tx_amount_ut.max(1),
+            fee_rate,
+        )
+        .await;
+        if tx.success {
+            expected_balance = expected_balance.saturating_sub(tx.fee_paid);
         }
+        tx_metrics.push(tx);
     }
 
     let observed_balance = driver.get_balance().await?;
@@ -786,6 +783,7 @@ mod tests {
                 minotari_cli: String::new(),
                 base_node: String::new(),
             },
+            seeds: None,
         }
     }
 
@@ -815,7 +813,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn s5_payment_processor_uses_batch_arm_only() {
+    async fn s5_runs_both_arms_for_payment_processor() {
         let driver = FakeDriver::new()
             .with_balances(VecDeque::from([10_000, 10_000]))
             .with_mode_name("payment_processor");
@@ -824,12 +822,12 @@ mod tests {
 
         assert_eq!(result.scenario_name, "S5");
         assert_eq!(state.batch_calls, vec![3, 3, 3, 3]);
-        assert_eq!(state.single_calls, 0);
-        assert_eq!(result.tx_metrics.len(), 4);
+        assert_eq!(state.single_calls, 12);
+        assert_eq!(result.tx_metrics.len(), 16); // 4 batch + 12 individual
     }
 
     #[tokio::test]
-    async fn s5_non_payment_processor_uses_individual_arm_only() {
+    async fn s5_runs_both_arms_for_non_payment_processor() {
         let driver = FakeDriver::new()
             .with_balances(VecDeque::from([10_000, 10_000]))
             .with_mode_name("new_wallet");
@@ -837,9 +835,9 @@ mod tests {
         let state = driver.state.lock().unwrap();
 
         assert_eq!(result.scenario_name, "S5");
-        assert_eq!(state.batch_calls.len(), 0);
+        assert_eq!(state.batch_calls, vec![3, 3, 3, 3]);
         assert_eq!(state.single_calls, 12);
-        assert_eq!(result.tx_metrics.len(), 12);
+        assert_eq!(result.tx_metrics.len(), 16); // 4 batch + 12 individual
     }
 
     #[tokio::test]
@@ -969,7 +967,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn s5_with_zero_s5k_uses_single_arm_only() {
+    async fn s5_with_zero_s5k_skips_batch_arm() {
         let mut cfg = sample_config();
         cfg.benchmark.s5_m = 6;
         cfg.benchmark.s5_k = 0;
@@ -979,9 +977,9 @@ mod tests {
         let result = run_s5(&driver, &cfg).await.unwrap();
         let state = driver.state.lock().unwrap();
 
-        // Non-payment-processor mode: all 6 sends use the single arm
-        assert_eq!(state.single_calls, 6);
+        // s5_k = 0 → num_batch_txs = 0, so only the individual arm runs
         assert_eq!(state.batch_calls.len(), 0);
+        assert_eq!(state.single_calls, 6);
         assert_eq!(result.success_count, 6);
     }
 

@@ -59,10 +59,11 @@ impl NewWalletDriver {
         base_node_url: String,
         confirmation_window: u64,
         password: String,
+        config_seed: Option<String>,
     ) -> anyhow::Result<Self> {
         fs::create_dir_all(&data_dir)
             .with_context(|| format!("failed to create {}", data_dir.display()))?;
-        let seed_words = Self::load_or_create_seed_words(&data_dir)?;
+        let seed_words = Self::load_or_create_seed_words(&data_dir, config_seed.as_deref())?;
         let key_manager = Self::build_key_manager(&seed_words)?;
 
         Ok(Self {
@@ -82,7 +83,10 @@ impl NewWalletDriver {
         self.data_dir.join("wallet.db")
     }
 
-    fn load_or_create_seed_words(data_dir: &std::path::Path) -> anyhow::Result<String> {
+    fn load_or_create_seed_words(
+        data_dir: &std::path::Path,
+        config_seed: Option<&str>,
+    ) -> anyhow::Result<String> {
         let words_path = shared::seed_words_path(data_dir);
         let database_path = data_dir.join("wallet.db");
         if !words_path.exists() && database_path.exists() {
@@ -92,7 +96,7 @@ impl NewWalletDriver {
                 words_path.display()
             ));
         }
-        shared::load_or_create_seed_words(data_dir)
+        shared::load_or_create_seed_words(data_dir, config_seed)
     }
 
     fn seed_words_with_birthday_for_driver(&self, birthday: u64) -> anyhow::Result<String> {

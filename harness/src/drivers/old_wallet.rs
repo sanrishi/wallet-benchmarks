@@ -44,10 +44,11 @@ impl OldWalletDriver {
         grpc_port: u16,
         base_node_url: String,
         confirmation_window: u64,
+        config_seed: Option<String>,
     ) -> anyhow::Result<Self> {
         let grpc_url = format!("http://127.0.0.1:{}", grpc_port);
         fs::create_dir_all(&data_dir)?;
-        let seed_words = Self::load_or_create_seed_words(&data_dir)?;
+        let seed_words = Self::load_or_create_seed_words(&data_dir, config_seed.as_deref())?;
         Ok(Self {
             wallet_bin,
             data_dir,
@@ -63,8 +64,11 @@ impl OldWalletDriver {
         })
     }
 
-    fn load_or_create_seed_words(data_dir: &std::path::Path) -> anyhow::Result<String> {
-        shared::load_or_create_seed_words(data_dir)
+    fn load_or_create_seed_words(
+        data_dir: &std::path::Path,
+        config_seed: Option<&str>,
+    ) -> anyhow::Result<String> {
+        shared::load_or_create_seed_words(data_dir, config_seed)
     }
 
     pub fn set_seed_birthday(&self, birthday_days: u64) -> anyhow::Result<()> {

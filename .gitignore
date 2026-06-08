@@ -9,3 +9,9 @@ wallet-data-pp/
 *.dll
 *.pdb
 *.so
+
+# Runtime logs
+/logs
+
+# Unrelated daemon sample config
+/config

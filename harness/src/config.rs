@@ -8,6 +8,7 @@ pub struct Config {
     pub passwords: Passwords,
     pub data: DataDirs,
     pub versions: VersionPins,
+    pub seeds: Option<SeedWords>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -61,6 +62,14 @@ pub struct VersionPins {
     pub console_wallet: String,
     pub minotari_cli: String,
     pub base_node: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct SeedWords {
+    pub old_wallet: Option<String>,
+    pub new_wallet: Option<String>,
+    pub payment_processor: Option<String>,
+    pub library_wallet: Option<String>,
 }
 
 #[cfg(test)]
@@ -149,6 +158,7 @@ base_node = "1.0.0"
         assert_eq!(c.versions.console_wallet, "1.0.0");
         assert_eq!(c.versions.minotari_cli, "1.0.0");
         assert_eq!(c.versions.base_node, "1.0.0");
+        assert!(c.seeds.is_none());
     }
 
     #[test]
@@ -282,6 +292,7 @@ base_node = "1.0.0"
                     minotari_cli: String::new(),
                     base_node: String::new(),
                 },
+                seeds: None,
             }
         }
     }

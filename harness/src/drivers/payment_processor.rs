@@ -103,11 +103,12 @@ impl PaymentProcessorDriver {
         base_node_url: String,
         confirmation_window: u64,
         password: String,
+        config_seed: Option<String>,
     ) -> anyhow::Result<Self> {
         std::fs::create_dir_all(&data_dir)
             .with_context(|| format!("failed to create {}", data_dir.display()))?;
 
-        let seed_words = Self::load_or_create_seed_words(&data_dir)?;
+        let seed_words = Self::load_or_create_seed_words(&data_dir, config_seed.as_deref())?;
         let pp_port = Self::find_free_port()?;
         let pr_port = Self::find_free_port()?;
 
@@ -131,8 +132,11 @@ impl PaymentProcessorDriver {
         })
     }
 
-    fn load_or_create_seed_words(data_dir: &std::path::Path) -> anyhow::Result<String> {
-        shared::load_or_create_seed_words(data_dir)
+    fn load_or_create_seed_words(
+        data_dir: &std::path::Path,
+        config_seed: Option<&str>,
+    ) -> anyhow::Result<String> {
+        shared::load_or_create_seed_words(data_dir, config_seed)
     }
 
     fn find_free_port() -> anyhow::Result<u16> {

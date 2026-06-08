@@ -97,6 +97,7 @@ git checkout feat/harness-implementation
 
 # Write VPS-optimized config.toml
 cat > config.toml << CONFIG_EOF
+[benchmark]
 a_fund = 300000000
 c_min = 3
 volume_target = 512
@@ -108,21 +109,34 @@ s5_m = 100
 s5_k = 10
 tx_amount_ut = 200
 fee_rate = "1"
+scan_interval_secs = 1
+
+[paths]
+wallet_bin = "./bin/minotari_console_wallet"
+minotari_bin = "./bin/minotari"
+payment_processor_bin = "./bin/minotari_payment_processor"
+console_wallet_bin = "./bin/minotari_console_wallet"
+
+[network]
 base_node_grpc_url = "http://127.0.0.1:18142"
 base_node_http_url = "http://127.0.0.1:18142"
-console_wallet_version = "$(cd $TARI_REPO && git log --oneline -1 | head -c 40 || echo 'unknown')"
-minotari_cli_version = "$(cd $CLI_REPO && git log --oneline -1 | head -c 40 || echo 'unknown')"
-base_node_version = "$(cd $TARI_REPO && git log --oneline -1 | head -c 40 || echo 'unknown')"
-wallet_bin_path = "./bin/minotari_console_wallet"
-minotari_bin_path = "./bin/minotari"
-payment_processor_bin_path = "./bin/minotari_payment_processor"
-old_wallet_password = "benchmark123"
-new_wallet_password = "benchmark_mode2_password_32_chars"
-payment_processor_password = "benchmark_mode3_password_32_chars"
-old_wallet_data_dir = "./wallet-data"
-new_wallet_data_dir = "./wallet-data-new"
-payment_processor_data_dir = "./wallet-data-pp"
 grpc_port = 18143
+
+[passwords]
+old_wallet = "benchmark123"
+new_wallet = "benchmark_mode2_password_32_chars"
+payment_processor = "benchmark_mode3_password_32_chars"
+library_wallet = "benchmark_lib_password_32_chars"
+
+[data]
+old_wallet = "./wallet-data"
+new_wallet = "./wallet-data-new"
+payment_processor = "./wallet-data-pp"
+
+[versions]
+console_wallet = "$(cd $TARI_REPO && git log --oneline -1 | head -c 40 || echo 'unknown')"
+minotari_cli = "$(cd $CLI_REPO && git log --oneline -1 | head -c 40 || echo 'unknown')"
+base_node = "$(cd $TARI_REPO && git log --oneline -1 | head -c 40 || echo 'unknown')"
 CONFIG_EOF
 
 # Create symlinks to built binaries so config paths stay portable

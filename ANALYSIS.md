@@ -21,9 +21,12 @@ required wallet modes:
 | `new_wallet` | Stateless `minotari` CLI subprocesses for wallet operations, local offline signing, HTTP JSON-RPC submit | Measures the practical performance surface of `minotari` without hiding CLI or signing pain points |
 | `payment_processor` | Same stateless `minotari` subprocess model with real multi-recipient batch creation | Measures 1-to-many throughput using the same user-facing transaction path |
 
-The implementation intentionally does **not** add harness-side retry, backoff,
+The implementation intentionally does **not** add scenario-level retry, backoff,
 artificial throttling, or UTXO pre-partitioning. Where a wallet stalls, rejects,
 or serializes internally, that behavior is surfaced as a benchmark result.
+(Driver internals may perform limited infrastructure retries — e.g. port-conflict
+retry in the new-wallet daemon, directory-lock retry in old-wallet reset —
+these are platform robustness concerns that do not mask wallet behavior.)
 
 For the current canonical-run budget, funding size and send size are
 intentionally decoupled:
@@ -59,7 +62,7 @@ with wallet budget.
 | `S2` | Full scan from genesis after S1 | **Implemented** | Validates recovered balance against pre-wipe post-`S1` checkpoint |
 | `S3` | Birthday scan after S1 | **Implemented** | Same checkpoint validation as `S2` |
 | `S4` | Concurrent construction | **Implemented** | True harness-level parallel submission; no concurrency cap added |
-| `S5` | Batch vs single throughput comparison | **Implemented** | `M/K` batch sends and `M` single sends, both recorded separately |
+| `S5` | Batch vs single throughput comparison | **Implemented** | `M/K` batch sends **and** `M` single sends run on every mode, enabling `s5_throughput_multiplier` computation |
 | `S6` | Full scan from genesis after S5 | **Implemented** | Validates against post-`S5` checkpoint |
 | `S7` | Birthday scan after S5 | **Implemented** | Validates against post-`S5` checkpoint |
 
@@ -97,6 +100,8 @@ Implications:
 - `S1` doubling rounds are modeled as actual 2-output sends
 - `S1` fan-out rounds are modeled as actual `fanout_outputs_per_tx` sends
 - `S5` batch arm is a real 1-to-many path, not just a loop of singles
+- `S5` runs **both** the batch arm and the individual-send arm on every mode,
+  producing a per-mode `s5_throughput_multiplier` in the report
 
 ### 3. Strict Scan Validation Against Checkpoints
 
@@ -166,7 +171,7 @@ This branch does that by:
 
 ## Compliance Warnings
 
-**Warning: No harness-level retry/backoff/throttle is added.**
+**Warning: No scenario-level retry/backoff/throttle is added.**
 
 Concurrent scenarios intentionally allow the wallet modes to expose:
 
@@ -178,6 +183,13 @@ Concurrent scenarios intentionally allow the wallet modes to expose:
 
 That is required by the principle in Issue `#1`: the harness measures wallet
 pain; it does not engineer around it.
+
+**Note on S4 resource amplification:** S4 spawns up to `max(concurrent_batches)`
+(typically 128) daemon instances simultaneously, each opening the same SQLite
+`wallet.db`. This creates lock contention that is partly an artifact of the
+per-call-daemon architecture, not purely a wallet bottleneck. The cross-mode
+comparison is still valid (all modes experience the same architecture), but
+absolute failure counts should be interpreted with this in mind.
 
 **Warning: Scan checkpoints are treated as correctness boundaries.**
 
@@ -194,7 +206,7 @@ most important non-network invariants:
 | --- | --- |
 | `S0` funding observation | Funding scenarios now record tx metrics instead of empty placeholders |
 | `S1` batch topology | Doubling rounds use 2-output batches; fan-out uses configured batch sizes |
-| `S5` count discipline | Batch arm uses `M/K` transactions; individual arm uses `M` transactions |
+| `S5` count discipline | Both arms (batch `M/K` txs + individual `M` txs) run on every mode |
 | Scan checkpoint failure | Scan scenarios fail when recovered balances do not match expected checkpoints |
 
 These tests complement the runtime harness behavior rather than replacing it.
@@ -279,8 +291,9 @@ Mode 3 (`payment_processor`) uses a dual-daemon architecture:
 Before the canonical funded run:
 
 1. build the harness in release mode
-2. print the three deterministic funding addresses
-3. fund each mode’s address with `a_fund`
+2. print the three funding addresses (deterministic from seeds in config, or
+   randomly generated and shown)
+3. fund each mode's address with `a_fund`
 4. set the exact pinned wallet/base-node versions in `config.toml`
 5. run the benchmark and capture `baseline_profile.json`
 

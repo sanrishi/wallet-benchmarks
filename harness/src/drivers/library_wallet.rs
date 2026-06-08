@@ -84,10 +84,11 @@ impl LibraryWalletDriver {
         base_node_url: String,
         confirmation_window: u64,
         password: String,
+        config_seed: Option<String>,
     ) -> anyhow::Result<Self> {
         std::fs::create_dir_all(&data_dir)
             .with_context(|| format!("failed to create {}", data_dir.display()))?;
-        let seed_words = shared::load_or_create_seed_words(&data_dir)?;
+        let seed_words = shared::load_or_create_seed_words(&data_dir, config_seed.as_deref())?;
         Ok(Self {
             wallet: Mutex::new(None),
             shutdown: Mutex::new(None),
