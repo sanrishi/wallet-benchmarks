@@ -216,6 +216,7 @@ fn build_report(
     config_snapshot: serde_json::Value,
     scenarios: Vec<ScenarioResult>,
     config: &Config,
+    setup_error: Option<String>,
 ) -> BenchmarkReport {
     let scan_delta_s2_minus_b0 = match (
         scan_duration(&scenarios, "B0"),
@@ -271,6 +272,7 @@ fn build_report(
         wallet_mode,
         config_snapshot,
         scenarios,
+        error: setup_error,
     }
 }
 
@@ -401,6 +403,7 @@ async fn main() -> anyhow::Result<()> {
         config_snapshot.clone(),
         old_wallet_scenarios,
         &config,
+        None,
     ));
 
     let (new_wallet_mode_name, new_wallet_scenarios) = if use_library_wallet {
@@ -417,9 +420,10 @@ async fn main() -> anyhow::Result<()> {
         config_snapshot.clone(),
         new_wallet_scenarios,
         &config,
+        None,
     ));
 
-    let (payment_processor_mode_name, payment_processor_scenarios) =
+    let (payment_processor_mode_name, payment_processor_scenarios, payment_processor_error) =
         match PaymentProcessorDriver::new(
             require_nonempty_path(
                 "payment_processor_bin",
@@ -440,24 +444,27 @@ async fn main() -> anyhow::Result<()> {
             Ok(mut pp) => match pp.start_daemon().await {
                 Ok(()) => {
                     let mode_name = pp.mode_name().to_string();
-                    let scenarios = match run_all_scenarios(&pp, &config).await {
-                        Ok(s) => s,
+                    let (scenarios, err) = match run_all_scenarios(&pp, &config).await {
+                        Ok(s) => (s, None),
                         Err(e) => {
-                            eprintln!("payment_processor scenarios failed: {e}");
-                            vec![]
+                            let msg = format!("payment_processor scenarios failed: {e}");
+                            eprintln!("{msg}");
+                            (vec![], Some(msg))
                         }
                     };
                     let _ = pp.stop_daemon().await;
-                    (mode_name, scenarios)
+                    (mode_name, scenarios, err)
                 }
                 Err(e) => {
-                    eprintln!("payment_processor daemon start failed: {e}");
-                    (pp.mode_name().to_string(), vec![])
+                    let msg = format!("payment_processor daemon start failed: {e}");
+                    eprintln!("{msg}");
+                    (pp.mode_name().to_string(), vec![], Some(msg))
                 }
             },
             Err(error) => {
-                eprintln!("payment_processor initialization failed: {error}");
-                ("payment_processor".to_string(), vec![])
+                let msg = format!("payment_processor initialization failed: {error}");
+                eprintln!("{msg}");
+                ("payment_processor".to_string(), vec![], Some(msg))
             }
         };
     reports.push(build_report(
@@ -469,6 +476,7 @@ async fn main() -> anyhow::Result<()> {
         config_snapshot,
         payment_processor_scenarios,
         &config,
+        payment_processor_error,
     ));
 
     let report_path = std::env::current_dir()

@@ -47,7 +47,7 @@ pub async fn run_b0(driver: &dyn WalletDriver) -> anyhow::Result<ScenarioResult>
         total_fees: 0,
         success_count: 1,
         failure_count: 0,
-        balance_delta: 0_i64.saturating_sub(observed_balance as i64),
+        balance_delta: observed_balance as i64,
         tx_metrics: Vec::new(),
         scan_metrics: Some(scan_metrics),
         recorded_birth_height: None,
@@ -58,6 +58,7 @@ pub async fn run_b0(driver: &dyn WalletDriver) -> anyhow::Result<ScenarioResult>
 pub async fn run_s0(driver: &dyn WalletDriver, config: &Config) -> anyhow::Result<ScenarioResult> {
     let started_at = Instant::now();
     let h_birth = driver.get_tip_height().await?;
+    let initial_balance = driver.get_balance().await?;
     let funding_tx = match driver.observe_funding(config.benchmark.a_fund).await {
         Ok(tx) => tx,
         Err(error) => TxMetrics {
@@ -81,7 +82,7 @@ pub async fn run_s0(driver: &dyn WalletDriver, config: &Config) -> anyhow::Resul
         total_fees: 0,
         success_count: u64::from(success),
         failure_count: u64::from(!success),
-        balance_delta: config.benchmark.a_fund as i64 - observed_balance as i64,
+        balance_delta: (initial_balance + config.benchmark.a_fund) as i64 - observed_balance as i64,
         tx_metrics: vec![funding_tx],
         scan_metrics: None,
         recorded_birth_height: Some(h_birth),

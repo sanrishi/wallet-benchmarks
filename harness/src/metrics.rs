@@ -52,4 +52,6 @@ pub struct BenchmarkReport {
     pub wallet_mode: String,
     pub config_snapshot: serde_json::Value,
     pub scenarios: Vec<ScenarioResult>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
