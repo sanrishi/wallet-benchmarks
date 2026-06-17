@@ -30,6 +30,7 @@ pub struct OldWalletDriver {
     pub grpc_port: u16,
     pub base_node_url: String,
     pub confirmation_window: u64,
+    pub startup_timeout_secs: u64,
     http_client: Client,
     seed_words: Mutex<String>,
     process: Mutex<Option<Child>>,
@@ -44,6 +45,7 @@ impl OldWalletDriver {
         grpc_port: u16,
         base_node_url: String,
         confirmation_window: u64,
+        startup_timeout_secs: u64,
         config_seed: Option<String>,
     ) -> anyhow::Result<Self> {
         let grpc_url = format!("http://127.0.0.1:{}", grpc_port);
@@ -57,6 +59,7 @@ impl OldWalletDriver {
             grpc_port,
             base_node_url,
             confirmation_window,
+            startup_timeout_secs,
             http_client: Client::new(),
             seed_words: Mutex::new(seed_words),
             process: Mutex::new(None),
@@ -108,8 +111,8 @@ impl OldWalletDriver {
             });
         }
 
-        // Poll gRPC port until ready (max 120s)
-        let deadline = Instant::now() + Duration::from_secs(120);
+        // Poll gRPC port until ready (max startup_timeout_secs)
+        let deadline = Instant::now() + Duration::from_secs(self.startup_timeout_secs);
         loop {
             if Instant::now() > deadline {
                 let _ = child.kill();
@@ -117,10 +120,14 @@ impl OldWalletDriver {
                 let stderr = stderr_capture.lock().unwrap().clone();
                 if !stderr.is_empty() {
                     return Err(anyhow!(
-                        "wallet gRPC did not become ready within 120s. stderr:\n{stderr}"
+                        "wallet gRPC did not become ready within {}s. stderr:\n{stderr}",
+                        self.startup_timeout_secs
                     ));
                 }
-                return Err(anyhow!("wallet gRPC did not become ready within 120s"));
+                return Err(anyhow!(
+                    "wallet gRPC did not become ready within {}s",
+                    self.startup_timeout_secs
+                ));
             }
             match child.try_wait() {
                 Ok(Some(status)) => {

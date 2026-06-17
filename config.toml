@@ -11,6 +11,9 @@ s5_k = 10
 tx_amount_ut = 200
 fee_rate = "1"
 scan_interval_secs = 1
+# Timeout (in seconds) for waiting for daemons/wallets to become ready during startup.
+# Increase if your node is still syncing from genesis.
+startup_timeout_secs = 600
 
 [paths]
 wallet_bin = ""

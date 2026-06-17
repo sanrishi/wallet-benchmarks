@@ -755,6 +755,7 @@ mod tests {
                 tx_amount_ut: 200,
                 fee_rate: "1".to_string(),
                 scan_interval_secs: 1,
+                startup_timeout_secs: 600,
             },
             paths: BinaryPaths {
                 wallet_bin: String::new(),

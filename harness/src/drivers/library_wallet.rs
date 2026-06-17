@@ -71,6 +71,8 @@ pub struct LibraryWalletDriver {
     data_dir: PathBuf,
     base_node_url: String,
     confirmation_window: u64,
+    #[allow(dead_code)]
+    startup_timeout_secs: u64,
     password: String,
     http_client: Client,
     cached_address: OnceLock<String>,
@@ -83,6 +85,7 @@ impl LibraryWalletDriver {
         data_dir: PathBuf,
         base_node_url: String,
         confirmation_window: u64,
+        startup_timeout_secs: u64,
         password: String,
         config_seed: Option<String>,
     ) -> anyhow::Result<Self> {
@@ -96,6 +99,7 @@ impl LibraryWalletDriver {
             data_dir,
             base_node_url,
             confirmation_window,
+            startup_timeout_secs,
             password,
             http_client: Client::new(),
             cached_address: OnceLock::new(),

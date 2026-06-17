@@ -4,7 +4,7 @@ use std::net::TcpListener;
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::str::FromStr;
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
 
@@ -45,10 +45,11 @@ pub struct NewWalletDriver {
     pub data_dir: PathBuf,
     pub base_node_url: String,
     confirmation_window: u64,
+    startup_timeout_secs: u64,
     http_client: Client,
     password: String,
-    seed_words: String,
-    key_manager: KeyManager,
+    seed_words: Mutex<String>,
+    key_manager: Mutex<KeyManager>,
     cached_address: OnceLock<String>,
 }
 
@@ -58,6 +59,7 @@ impl NewWalletDriver {
         data_dir: PathBuf,
         base_node_url: String,
         confirmation_window: u64,
+        startup_timeout_secs: u64,
         password: String,
         config_seed: Option<String>,
     ) -> anyhow::Result<Self> {
@@ -71,10 +73,11 @@ impl NewWalletDriver {
             data_dir,
             base_node_url,
             confirmation_window,
+            startup_timeout_secs,
             http_client: Client::new(),
             password,
-            seed_words,
-            key_manager,
+            seed_words: Mutex::new(seed_words),
+            key_manager: Mutex::new(key_manager),
             cached_address: OnceLock::new(),
         })
     }
@@ -100,7 +103,7 @@ impl NewWalletDriver {
     }
 
     fn seed_words_with_birthday_for_driver(&self, birthday: u64) -> anyhow::Result<String> {
-        seed_words_with_birthday(&self.seed_words, birthday)
+        seed_words_with_birthday(&self.seed_words.lock().unwrap(), birthday)
     }
 
     async fn ensure_wallet_initialized_with_seed_words(
@@ -156,7 +159,8 @@ impl NewWalletDriver {
     }
 
     async fn ensure_wallet_initialized(&self) -> anyhow::Result<()> {
-        self.ensure_wallet_initialized_with_seed_words(&self.seed_words)
+        let seed_words = self.seed_words.lock().unwrap().clone();
+        self.ensure_wallet_initialized_with_seed_words(&seed_words)
             .await
     }
 
@@ -172,15 +176,15 @@ impl NewWalletDriver {
         KeyManager::new(wallet).context("failed to build key manager for new_wallet")
     }
 
-    fn key_manager(&self) -> &KeyManager {
-        &self.key_manager
+    fn key_manager(&self) -> std::sync::MutexGuard<'_, KeyManager> {
+        self.key_manager.lock().unwrap()
     }
 
     fn self_address_string(&self) -> anyhow::Result<String> {
         if let Some(addr) = self.cached_address.get() {
             return Ok(addr.clone());
         }
-        let mnemonic = SeedWords::from_str(&self.seed_words)
+        let mnemonic = SeedWords::from_str(&self.seed_words.lock().unwrap())
             .context("failed to parse stored seed words for new_wallet address")?;
         let cipher_seed = CipherSeed::from_mnemonic(&mnemonic, None)
             .context("failed to reconstruct cipher seed for new_wallet address")?;
@@ -300,7 +304,7 @@ impl NewWalletDriver {
                 child,
                 base_url: format!("http://127.0.0.1:{port}"),
             };
-            let deadline = Instant::now() + Duration::from_secs(30);
+            let deadline = Instant::now() + Duration::from_secs(self.startup_timeout_secs);
             let mut ready = false;
             while Instant::now() <= deadline {
                 if self
@@ -410,6 +414,11 @@ impl NewWalletDriver {
         }
         self.ensure_wallet_initialized_with_seed_words(&seed_words)
             .await?;
+
+        // Sync the in-memory key manager with the new seed words so that
+        // subsequent offline signing uses the correct keys.
+        *self.seed_words.lock().unwrap() = seed_words.clone();
+        *self.key_manager.lock().unwrap() = Self::build_key_manager(&seed_words)?;
 
         let database_path = self.database_path();
         let database_path = database_path
@@ -595,9 +604,8 @@ impl NewWalletDriver {
         let unsigned_tx = PrepareOneSidedTransactionForSigningResult::from_json(&unsigned_json)
             .context("failed to parse unsigned transaction JSON")?;
 
-        let key_manager = self.key_manager();
         let signed = sign_locked_transaction(
-            key_manager,
+            &*self.key_manager(),
             ConsensusConstantsBuilder::new(Network::Esmeralda).build(),
             Network::Esmeralda,
             unsigned_tx,

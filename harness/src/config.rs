@@ -25,6 +25,7 @@ pub struct BenchmarkParams {
     pub tx_amount_ut: u64,
     pub fee_rate: String,
     pub scan_interval_secs: u64,
+    pub startup_timeout_secs: u64,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -91,6 +92,7 @@ s5_k = 4
 tx_amount_ut = 1000
 fee_rate = "2"
 scan_interval_secs = 1
+startup_timeout_secs = 600
 
 [paths]
 wallet_bin = "/usr/bin/minotari_console_wallet"
@@ -141,6 +143,7 @@ base_node = "1.0.0"
         assert_eq!(c.benchmark.tx_amount_ut, 1000);
         assert_eq!(c.benchmark.fee_rate, "2");
         assert_eq!(c.benchmark.scan_interval_secs, 1);
+        assert_eq!(c.benchmark.startup_timeout_secs, 600);
         assert_eq!(c.network.base_node_grpc_url, "grpc://localhost:18142");
         assert_eq!(c.network.base_node_http_url, "http://localhost:18143");
         assert_eq!(c.network.grpc_port, 18142);
@@ -191,6 +194,7 @@ base_node = "1.0.0"
             .replace("s5_k = 4", "s5_k = 0")
             .replace("tx_amount_ut = 1000", "tx_amount_ut = 0")
             .replace("scan_interval_secs = 1", "scan_interval_secs = 0")
+            .replace("startup_timeout_secs = 600", "startup_timeout_secs = 0")
             .replace("grpc_port = 18142", "grpc_port = 0");
         let c = parse(&toml);
         assert_eq!(c.benchmark.a_fund, 0);
@@ -203,6 +207,7 @@ base_node = "1.0.0"
         assert_eq!(c.benchmark.s5_k, 0);
         assert_eq!(c.benchmark.tx_amount_ut, 0);
         assert_eq!(c.benchmark.scan_interval_secs, 0);
+        assert_eq!(c.benchmark.startup_timeout_secs, 0);
         assert_eq!(c.network.grpc_port, 0);
     }
 
@@ -255,6 +260,7 @@ base_node = "1.0.0"
             s5_k in 0u64..100u64,
             tx_amount_ut in 0u64..1_000_000u64,
             fee_rate in arbitrary_string(10),
+            startup_timeout_secs in 0u64..7200u64,
             grpc_port in 0u16..65535u16,
         ) -> Config {
             Config {
@@ -264,6 +270,7 @@ base_node = "1.0.0"
                     s4_t_budget_secs, s5_m, s5_k, tx_amount_ut,
                     fee_rate,
                     scan_interval_secs: 1,
+                    startup_timeout_secs,
                 },
                 paths: BinaryPaths {
                     wallet_bin: String::new(),
@@ -313,6 +320,7 @@ base_node = "1.0.0"
             assert_eq!(deserialized.benchmark.s5_k, cfg.benchmark.s5_k);
             assert_eq!(deserialized.benchmark.tx_amount_ut, cfg.benchmark.tx_amount_ut);
             assert_eq!(deserialized.benchmark.fee_rate, cfg.benchmark.fee_rate);
+            assert_eq!(deserialized.benchmark.startup_timeout_secs, cfg.benchmark.startup_timeout_secs);
             assert_eq!(deserialized.network.grpc_port, cfg.network.grpc_port);
         }
     }

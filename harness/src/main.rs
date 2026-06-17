@@ -106,6 +106,7 @@ async fn print_all_wallet_addresses(config: &Config, use_library_wallet: bool) -
         config.network.grpc_port,
         config.network.base_node_http_url.clone(),
         config.benchmark.c_min,
+        config.benchmark.startup_timeout_secs,
         config_seed_for(config, "old_wallet"),
     )?;
     old_wallet.start().await?;
@@ -121,6 +122,7 @@ async fn print_all_wallet_addresses(config: &Config, use_library_wallet: bool) -
                 require_nonempty_path("new_wallet", &config.data.new_wallet)?,
                 config.network.base_node_http_url.clone(),
                 config.benchmark.c_min,
+                config.benchmark.startup_timeout_secs,
                 config.passwords.library_wallet.clone(),
                 config_seed_for(config, "library_wallet"),
             )?;
@@ -137,6 +139,7 @@ async fn print_all_wallet_addresses(config: &Config, use_library_wallet: bool) -
             require_nonempty_path("new_wallet", &config.data.new_wallet)?,
             config.network.base_node_http_url.clone(),
             config.benchmark.c_min,
+            config.benchmark.startup_timeout_secs,
             config.passwords.new_wallet.clone(),
             config_seed_for(config, "new_wallet"),
         )?;
@@ -156,6 +159,7 @@ async fn print_all_wallet_addresses(config: &Config, use_library_wallet: bool) -
         require_nonempty_path("console_wallet_bin", &config.paths.console_wallet_bin)?,
         config.network.base_node_http_url.clone(),
         config.benchmark.c_min,
+        config.benchmark.startup_timeout_secs,
         config.passwords.payment_processor.clone(),
         config_seed_for(config, "payment_processor"),
     )?;
@@ -277,6 +281,7 @@ async fn run_new_wallet(config: &Config) -> (String, Vec<ScenarioResult>) {
             require_nonempty_path("new_wallet", &config.data.new_wallet)?,
             config.network.base_node_http_url.clone(),
             config.benchmark.c_min,
+            config.benchmark.startup_timeout_secs,
             config.passwords.new_wallet.clone(),
             config_seed_for(config, "new_wallet"),
         )?)
@@ -308,6 +313,7 @@ async fn run_library_wallet(config: &Config) -> (String, Vec<ScenarioResult>) {
             require_nonempty_path("new_wallet", &config.data.new_wallet)?,
             config.network.base_node_http_url.clone(),
             config.benchmark.c_min,
+            config.benchmark.startup_timeout_secs,
             config.passwords.library_wallet.clone(),
             config_seed_for(config, "library_wallet"),
         )?)
@@ -382,6 +388,7 @@ async fn main() -> anyhow::Result<()> {
         config.network.grpc_port,
         config.network.base_node_http_url.clone(),
         config.benchmark.c_min,
+        config.benchmark.startup_timeout_secs,
         config_seed_for(&config, "old_wallet"),
     )?;
     let old_wallet_scenarios = run_old_wallet_scenarios(&old_wallet, &config).await;
@@ -426,6 +433,7 @@ async fn main() -> anyhow::Result<()> {
             require_nonempty_path("console_wallet_bin", &config.paths.console_wallet_bin)?,
             config.network.base_node_http_url.clone(),
             config.benchmark.c_min,
+            config.benchmark.startup_timeout_secs,
             config.passwords.payment_processor.clone(),
             config_seed_for(&config, "payment_processor"),
         ) {

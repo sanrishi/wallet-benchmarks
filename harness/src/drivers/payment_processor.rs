@@ -82,6 +82,7 @@ pub struct PaymentProcessorDriver {
     data_dir: PathBuf,
     base_node_url: String,
     confirmation_window: u64,
+    startup_timeout_secs: u64,
     password: String,
     http_client: Client,
     seed_words: Mutex<String>,
@@ -102,6 +103,7 @@ impl PaymentProcessorDriver {
         console_wallet_bin: PathBuf,
         base_node_url: String,
         confirmation_window: u64,
+        startup_timeout_secs: u64,
         password: String,
         config_seed: Option<String>,
     ) -> anyhow::Result<Self> {
@@ -119,6 +121,7 @@ impl PaymentProcessorDriver {
             console_wallet_bin_path: console_wallet_bin,
             base_node_url,
             confirmation_window,
+            startup_timeout_secs,
             password,
             http_client: Client::new(),
             seed_words: Mutex::new(seed_words),
@@ -228,7 +231,7 @@ impl PaymentProcessorDriver {
                 })?;
 
             let base_url = format!("http://127.0.0.1:{port}");
-            let deadline = Instant::now() + Duration::from_secs(30);
+            let deadline = Instant::now() + Duration::from_secs(self.startup_timeout_secs);
             loop {
                 if Instant::now() > deadline {
                     break;
@@ -318,13 +321,14 @@ impl PaymentProcessorDriver {
                 )
             })?;
 
-        let deadline = Instant::now() + Duration::from_secs(60);
+        let deadline = Instant::now() + Duration::from_secs(self.startup_timeout_secs);
         let health_url = format!("{api_url}/health/version");
         loop {
             if Instant::now() > deadline {
                 let _ = child.try_wait();
                 return Err(anyhow!(
-                    "PP daemon did not become ready within 60s at {health_url}"
+                    "PP daemon did not become ready within {}s at {health_url}",
+                    self.startup_timeout_secs
                 ));
             }
             if self.http_client.get(&health_url).send().await.is_ok() {
