@@ -1,7 +1,7 @@
 use std::net::TcpListener;
 use std::path::PathBuf;
 use std::process::Stdio;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
@@ -210,6 +210,9 @@ impl PaymentProcessorDriver {
                 p
             };
 
+            let stderr_capture = Arc::new(Mutex::new(String::new()));
+            let stderr_capture_clone = stderr_capture.clone();
+
             let mut child = Command::new(&self.minotari_bin)
                 .arg("daemon")
                 .arg("--password")
@@ -221,7 +224,7 @@ impl PaymentProcessorDriver {
                 .arg("--base-url")
                 .arg(&self.base_node_url)
                 .stdout(Stdio::null())
-                .stderr(Stdio::null())
+                .stderr(Stdio::piped())
                 .spawn()
                 .with_context(|| {
                     format!(
@@ -230,11 +233,33 @@ impl PaymentProcessorDriver {
                     )
                 })?;
 
+            if let Some(mut stderr) = child.stderr.take() {
+                tokio::spawn(async move {
+                    use tokio::io::AsyncReadExt;
+                    let mut buf = String::new();
+                    let _ = stderr.read_to_string(&mut buf).await;
+                    *stderr_capture_clone.lock().unwrap() = buf;
+                });
+            }
+
             let base_url = format!("http://127.0.0.1:{port}");
             let deadline = Instant::now() + Duration::from_secs(self.startup_timeout_secs);
             loop {
                 if Instant::now() > deadline {
                     break;
+                }
+                match child.try_wait() {
+                    Ok(Some(status)) => {
+                        let stderr = stderr_capture.lock().unwrap().clone();
+                        let msg = if stderr.is_empty() {
+                            format!("PR daemon exited early with {status}")
+                        } else {
+                            format!("PR daemon exited early with {status}. stderr:\n{stderr}")
+                        };
+                        return Err(anyhow!(msg));
+                    }
+                    Ok(None) => {}
+                    Err(e) => return Err(anyhow!("failed to check PR daemon status: {e}")),
                 }
                 if self
                     .http_client
@@ -250,7 +275,7 @@ impl PaymentProcessorDriver {
                 }
                 tokio::time::sleep(Duration::from_millis(250)).await;
             }
-            // Port may have collided (TIME_WAIT) — kill and retry
+            // Port may have collided (TIME_WAIT) or process died — kill and retry
             let _ = child.try_wait();
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
@@ -292,6 +317,9 @@ impl PaymentProcessorDriver {
             derive_wallet_keys(&words)?
         };
 
+        let stderr_capture = Arc::new(Mutex::new(String::new()));
+        let stderr_capture_clone = stderr_capture.clone();
+
         let mut child = Command::new(&self.pp_bin)
             .env("DATABASE_URL", &db_url)
             .env("TARI_NETWORK", "Esmeralda")
@@ -321,15 +349,46 @@ impl PaymentProcessorDriver {
                 )
             })?;
 
+        if let Some(mut stderr) = child.stderr.take() {
+            tokio::spawn(async move {
+                use tokio::io::AsyncReadExt;
+                let mut buf = String::new();
+                let _ = stderr.read_to_string(&mut buf).await;
+                *stderr_capture_clone.lock().unwrap() = buf;
+            });
+        }
+
         let deadline = Instant::now() + Duration::from_secs(self.startup_timeout_secs);
         let health_url = format!("{api_url}/health/version");
         loop {
             if Instant::now() > deadline {
+                let stderr = stderr_capture.lock().unwrap().clone();
                 let _ = child.try_wait();
-                return Err(anyhow!(
-                    "PP daemon did not become ready within {}s at {health_url}",
-                    self.startup_timeout_secs
-                ));
+                let msg = if stderr.is_empty() {
+                    format!(
+                        "PP daemon did not become ready within {}s at {health_url}",
+                        self.startup_timeout_secs
+                    )
+                } else {
+                    format!(
+                        "PP daemon did not become ready within {}s at {health_url}. stderr:\n{stderr}",
+                        self.startup_timeout_secs
+                    )
+                };
+                return Err(anyhow!(msg));
+            }
+            match child.try_wait() {
+                Ok(Some(status)) => {
+                    let stderr = stderr_capture.lock().unwrap().clone();
+                    let msg = if stderr.is_empty() {
+                        format!("PP daemon exited early with {status}")
+                    } else {
+                        format!("PP daemon exited early with {status}. stderr:\n{stderr}")
+                    };
+                    return Err(anyhow!(msg));
+                }
+                Ok(None) => {}
+                Err(e) => return Err(anyhow!("failed to check PP daemon status: {e}")),
             }
             if self.http_client.get(&health_url).send().await.is_ok() {
                 break;
