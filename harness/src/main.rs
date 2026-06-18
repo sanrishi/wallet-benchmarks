@@ -33,6 +33,15 @@ async fn run_old_wallet_scenarios(
     old_wallet: &OldWalletDriver,
     config: &Config,
 ) -> Vec<ScenarioResult> {
+    // Print wallet address before any scenario runs so the operator can
+    // confirm they funded the correct wallet.
+    if old_wallet.start().await.is_ok() {
+        if let Ok(addr) = old_wallet.get_self_address().await {
+            println!("old_wallet address: {addr}");
+        }
+        old_wallet.stop();
+    }
+
     let mut scenarios = Vec::new();
 
     scenarios.push(match run_b0(old_wallet).await {
@@ -290,6 +299,9 @@ async fn run_new_wallet(config: &Config) -> (String, Vec<ScenarioResult>) {
     })();
     match new_wallet {
         Ok(new_wallet) => {
+            if let Ok(addr) = new_wallet.get_self_address().await {
+                println!("new_wallet address: {addr}");
+            }
             let mode_name = new_wallet.mode_name().to_string();
             let scenarios = match run_all_scenarios(&new_wallet, config).await {
                 Ok(scenarios) => scenarios,
@@ -443,6 +455,9 @@ async fn main() -> anyhow::Result<()> {
         ) {
             Ok(mut pp) => match pp.start_daemon().await {
                 Ok(()) => {
+                    if let Ok(addr) = pp.get_self_address().await {
+                        println!("payment_processor address: {addr}");
+                    }
                     let mode_name = pp.mode_name().to_string();
                     let (scenarios, err) = match run_all_scenarios(&pp, &config).await {
                         Ok(s) => (s, None),

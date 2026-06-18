@@ -235,8 +235,8 @@ impl OldWalletDriver {
 
     /// Internal helper: restart the wallet with the given birthday and wait for it
     /// to finish scanning.  If `rescan_from_height` is Some and non-zero, a gRPC
-    /// RescanWallet(height) is issued after startup (non-zero heights work correctly
-    /// upstream; only height=0 is broken — handled via --seed-words birthday=0 instead).
+    /// RescanWallet(height) is always issued after startup.  Non-zero heights work
+    /// correctly upstream; height=0 is broken so genesis scans use height=1.
     async fn do_scan(
         &self,
         birthday_days: u64,
@@ -259,15 +259,22 @@ impl OldWalletDriver {
         let target_tip = h_tip_start;
         self.start().await?;
 
-        // 5. For non-zero rescan heights, issue gRPC RescanWallet (works correctly
-        //    when from_height > 0).  For height=0 we rely on --seed-words at startup.
-        if let Some(fh) = rescan_from_height {
-            if fh > 0 {
-                let mut client = WalletClient::connect(self.grpc_url.clone()).await?;
-                client
-                    .rescan_wallet(RescanWalletRequest { from_height: fh })
-                    .await?;
-            }
+        // 5. Issue gRPC RescanWallet to trigger a blockchain scan.  The
+        //    non-zero height path works correctly upstream; for genesis scans
+        //    we use height=1 (block 0 has no user funds) because height=0 is
+        //    broken upstream and --seed-words alone no longer triggers a rescan
+        //    in recent wallet versions.
+        let rescan_height = match rescan_from_height {
+            Some(fh) if fh > 0 => fh,
+            _ => 1,
+        };
+        {
+            let mut client = WalletClient::connect(self.grpc_url.clone()).await?;
+            client
+                .rescan_wallet(RescanWalletRequest {
+                    from_height: rescan_height,
+                })
+                .await?;
         }
 
         // 6. Wait for wallet to sync to tip.
