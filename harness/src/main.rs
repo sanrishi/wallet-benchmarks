@@ -33,15 +33,6 @@ async fn run_old_wallet_scenarios(
     old_wallet: &OldWalletDriver,
     config: &Config,
 ) -> Vec<ScenarioResult> {
-    // Print wallet address before any scenario runs so the operator can
-    // confirm they funded the correct wallet.
-    if old_wallet.start().await.is_ok() {
-        if let Ok(addr) = old_wallet.get_self_address().await {
-            println!("old_wallet address: {addr}");
-        }
-        old_wallet.stop();
-    }
-
     let mut scenarios = Vec::new();
 
     scenarios.push(match run_b0(old_wallet).await {
