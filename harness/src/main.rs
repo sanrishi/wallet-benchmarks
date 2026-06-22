@@ -54,6 +54,14 @@ async fn run_old_wallet_scenarios(
     });
     let post_s1_balance = old_wallet.get_balance().await.unwrap_or(0);
 
+    // Wait for any pending S1 transactions before the reconstruction test
+    if let Err(e) = old_wallet
+        .await_all_pending(config.benchmark.confirmation_timeout_secs)
+        .await
+    {
+        eprintln!("pending S1 transactions did not clear in time: {e}");
+    }
+
     scenarios.push(match run_s2(old_wallet, post_s1_balance).await {
         Ok(s) => s,
         Err(e) => scenario_error_result("S2", e.to_string()),
@@ -75,6 +83,14 @@ async fn run_old_wallet_scenarios(
         Err(e) => scenario_error_result("S5", e.to_string()),
     });
     let post_s5_balance = old_wallet.get_balance().await.unwrap_or(0);
+
+    // Wait for any pending S5 transactions before the reconstruction test
+    if let Err(e) = old_wallet
+        .await_all_pending(config.benchmark.confirmation_timeout_secs)
+        .await
+    {
+        eprintln!("pending S5 transactions did not clear in time: {e}");
+    }
 
     scenarios.push(match run_s6(old_wallet, post_s5_balance).await {
         Ok(s) => s,
@@ -107,6 +123,7 @@ async fn print_all_wallet_addresses(config: &Config, use_library_wallet: bool) -
         config.network.base_node_http_url.clone(),
         config.benchmark.c_min,
         config.benchmark.startup_timeout_secs,
+        config.benchmark.confirmation_timeout_secs,
         config_seed_for(config, "old_wallet"),
     )?;
     old_wallet.start().await?;
@@ -394,6 +411,7 @@ async fn main() -> anyhow::Result<()> {
         config.network.base_node_http_url.clone(),
         config.benchmark.c_min,
         config.benchmark.startup_timeout_secs,
+        config.benchmark.confirmation_timeout_secs,
         config_seed_for(&config, "old_wallet"),
     )?;
     let old_wallet_scenarios = run_old_wallet_scenarios(&old_wallet, &config).await;

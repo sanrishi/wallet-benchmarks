@@ -49,4 +49,10 @@ pub trait WalletDriver: Sync {
             "observe_funding not supported by this driver"
         ))
     }
+
+    /// Wait for all pending outgoing transactions to confirm.
+    /// Default no-op; drivers with pending-tx tracking override this.
+    async fn await_all_pending(&self, _timeout_secs: u64) -> anyhow::Result<()> {
+        Ok(())
+    }
 }

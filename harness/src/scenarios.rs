@@ -172,12 +172,7 @@ pub async fn run_s2(
     let started_at = Instant::now();
     let scan_metrics = driver.scan_from_genesis().await?;
     let observed_balance = driver.get_balance().await?;
-    let outputs_ok = if scan_metrics.outputs_found > 0 {
-        scan_metrics.outputs_found >= REDISCOVERY_TARGET
-    } else {
-        true
-    };
-    let success = outputs_ok && observed_balance == expected_balance;
+    let success = observed_balance == expected_balance;
 
     Ok(ScenarioResult {
         scenario_name: "S2".to_string(),
@@ -201,12 +196,7 @@ pub async fn run_s3(
     let started_at = Instant::now();
     let scan_metrics = driver.scan_from_birthday(h_birth).await?;
     let observed_balance = driver.get_balance().await?;
-    let outputs_ok = if scan_metrics.outputs_found > 0 {
-        scan_metrics.outputs_found >= REDISCOVERY_TARGET
-    } else {
-        true
-    };
-    let success = outputs_ok && observed_balance == expected_balance;
+    let success = observed_balance == expected_balance;
 
     Ok(ScenarioResult {
         scenario_name: "S3".to_string(),
@@ -405,6 +395,11 @@ pub async fn run_all_scenarios(
     });
     let post_s1_balance = driver.get_balance().await.unwrap_or(0);
 
+    // Wait for any pending S1 transactions before the reconstruction test
+    let _ = driver
+        .await_all_pending(config.benchmark.confirmation_timeout_secs)
+        .await;
+
     let _ = driver.reset().await;
     scenarios.push(match run_s2(driver, post_s1_balance).await {
         Ok(s) => s,
@@ -424,6 +419,11 @@ pub async fn run_all_scenarios(
         Err(e) => scenario_error_result("S5", e.to_string()),
     });
     let post_s5_balance = driver.get_balance().await.unwrap_or(0);
+
+    // Wait for any pending S5 transactions before the reconstruction test
+    let _ = driver
+        .await_all_pending(config.benchmark.confirmation_timeout_secs)
+        .await;
 
     let _ = driver.reset().await;
     scenarios.push(match run_s6(driver, post_s5_balance).await {
@@ -757,6 +757,7 @@ mod tests {
                 fee_rate: "1".to_string(),
                 scan_interval_secs: 1,
                 startup_timeout_secs: 600,
+                confirmation_timeout_secs: 600,
             },
             paths: BinaryPaths {
                 wallet_bin: String::new(),

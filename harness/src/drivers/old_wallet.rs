@@ -31,6 +31,7 @@ pub struct OldWalletDriver {
     pub base_node_url: String,
     pub confirmation_window: u64,
     pub startup_timeout_secs: u64,
+    pub confirmation_timeout_secs: u64,
     http_client: Client,
     seed_words: Mutex<String>,
     process: Mutex<Option<Child>>,
@@ -46,6 +47,7 @@ impl OldWalletDriver {
         base_node_url: String,
         confirmation_window: u64,
         startup_timeout_secs: u64,
+        confirmation_timeout_secs: u64,
         config_seed: Option<String>,
     ) -> anyhow::Result<Self> {
         let grpc_url = format!("http://127.0.0.1:{}", grpc_port);
@@ -60,6 +62,7 @@ impl OldWalletDriver {
             base_node_url,
             confirmation_window,
             startup_timeout_secs,
+            confirmation_timeout_secs,
             http_client: Client::new(),
             seed_words: Mutex::new(seed_words),
             process: Mutex::new(None),
@@ -345,7 +348,7 @@ impl OldWalletDriver {
         use tari_rpc::GetTransactionInfoRequest;
 
         let started_at = Instant::now();
-        let deadline = started_at + Duration::from_secs(600);
+        let deadline = started_at + Duration::from_secs(self.confirmation_timeout_secs);
         let required_confirmations = self.confirmation_window.max(1);
         let confirmed_statuses = [
             tari_rpc::TransactionStatus::MinedConfirmed as i32,
@@ -358,7 +361,7 @@ impl OldWalletDriver {
 
         loop {
             if Instant::now() > deadline {
-                return Err(anyhow!("transaction {tx_id} was not confirmed within 600s"));
+                return Err(anyhow!("transaction {tx_id} was not confirmed within {}s", self.confirmation_timeout_secs));
             }
 
             let mut client = WalletClient::connect(self.grpc_url.clone()).await?;
@@ -619,14 +622,15 @@ impl WalletDriver for OldWalletDriver {
         use tari_rpc::GetStateRequest;
 
         let started_at = Instant::now();
-        let deadline = started_at + Duration::from_secs(600);
+        let deadline = started_at + Duration::from_secs(self.confirmation_timeout_secs);
         let mut first_seen_pending_at = None;
         let mut observed_tx_id = None;
 
         loop {
             if Instant::now() > deadline {
                 return Err(anyhow!(
-                    "incoming funding of at least {expected_amount_ut} uT was not observed within 600s"
+                    "incoming funding of at least {expected_amount_ut} uT was not observed within {}s",
+                    self.confirmation_timeout_secs,
                 ));
             }
 
@@ -659,6 +663,32 @@ impl WalletDriver for OldWalletDriver {
                     success: true,
                     error: None,
                 });
+            }
+
+            tokio::time::sleep(Duration::from_secs(2)).await;
+        }
+    }
+
+    async fn await_all_pending(&self, timeout_secs: u64) -> anyhow::Result<()> {
+        use tari_rpc::wallet_client::WalletClient;
+        use tari_rpc::GetStateRequest;
+
+        let deadline = Instant::now() + Duration::from_secs(timeout_secs);
+        loop {
+            if Instant::now() > deadline {
+                return Err(anyhow!(
+                    "pending outgoing transactions did not clear within {timeout_secs}s"
+                ));
+            }
+
+            let mut client = WalletClient::connect(self.grpc_url.clone()).await?;
+            let state = client.get_state(GetStateRequest {}).await?.into_inner();
+            let balance = state
+                .balance
+                .ok_or_else(|| anyhow!("wallet state returned no balance"))?;
+
+            if balance.pending_outgoing_balance == 0 {
+                return Ok(());
             }
 
             tokio::time::sleep(Duration::from_secs(2)).await;
