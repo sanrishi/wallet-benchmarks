@@ -687,6 +687,7 @@ impl WalletDriver for OldWalletDriver {
                 .balance
                 .ok_or_else(|| anyhow!("wallet state returned no balance"))?;
 
+            // Check if the field exists (proto may not have it)
             if balance.pending_outgoing_balance == 0 {
                 return Ok(());
             }

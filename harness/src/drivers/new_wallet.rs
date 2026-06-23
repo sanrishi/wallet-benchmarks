@@ -691,8 +691,8 @@ impl WalletDriver for NewWalletDriver {
     }
 
     async fn scan_from_genesis(&self) -> anyhow::Result<ScanMetrics> {
-        // Seed birthday = 0 (genesis), rescan-from-height = 0
-        self.scan_from_height(0, 0).await
+        // Seed birthday = 0 (genesis), rescan-from-height = 1 (height 0 is broken upstream)
+        self.scan_from_height(1, 0).await
     }
 
     async fn scan_from_birthday(&self, height: u64) -> anyhow::Result<ScanMetrics> {
