@@ -94,7 +94,8 @@ pub fn parse_balance_output(stdout: &str) -> anyhow::Result<u64> {
     Ok(amount.as_u64())
 }
 
-/// Derive the view key and public spend key hex strings from wallet seed words.
+/// Derive the private view key and public spend key hex strings from wallet seed words.
+/// Returns (private_view_key_hex, public_spend_key_hex)
 pub fn derive_wallet_keys(seed_words: &str) -> anyhow::Result<(String, String)> {
     use tari_utilities::byte_array::ByteArray;
 
@@ -102,17 +103,24 @@ pub fn derive_wallet_keys(seed_words: &str) -> anyhow::Result<(String, String)> 
         SeedWords::from_str(seed_words).context("failed to parse seed words for key derivation")?;
     let cipher_seed = CipherSeed::from_mnemonic(&mnemonic, None)
         .context("failed to reconstruct cipher seed for key derivation")?;
+
+    // Use WalletType to derive both private view key and public spend key
     let wallet = WalletType::SeedWords(
         SeedWordsWallet::construct_new(cipher_seed)
             .map_err(|e| anyhow::anyhow!("failed to construct wallet for key derivation: {e}"))?,
     );
-    let view_key = wallet.get_public_view_key();
-    let spend_key = wallet.get_public_spend_key();
-    let view_key_bytes = view_key.as_bytes();
-    let spend_key_bytes = spend_key.as_bytes();
-    let view_key_hex = view_key_bytes.iter().map(|b| format!("{b:02x}")).collect();
-    let spend_key_hex = spend_key_bytes.iter().map(|b| format!("{b:02x}")).collect();
-    Ok((view_key_hex, spend_key_hex))
+    
+    // Get the private view key from the wallet (this returns a PrivateKey)
+    let private_view_key = wallet.get_view_key();
+    let private_view_key_bytes = private_view_key.as_bytes();
+    let private_view_key_hex = private_view_key_bytes.iter().map(|b| format!("{b:02x}")).collect::<String>();
+
+    // Get the public spend key
+    let public_spend_key = wallet.get_public_spend_key();
+    let spend_key_bytes = public_spend_key.as_bytes();
+    let spend_key_hex = spend_key_bytes.iter().map(|b| format!("{b:02x}")).collect::<String>();
+
+    Ok((private_view_key_hex, spend_key_hex))
 }
 
 /// Query the base node for the current chain tip height.
