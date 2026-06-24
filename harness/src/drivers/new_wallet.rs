@@ -401,25 +401,13 @@ impl NewWalletDriver {
     ) -> anyhow::Result<ScanMetrics> {
         let seed_words = self.seed_words_with_birthday_for_driver(seed_birthday_days)?;
 
-        // Ensure the birthday encoded in the seed words takes effect by
-        // recreating the wallet if the database already exists with a
-        // different (original) birthday.
-        if self.database_path().exists() {
-            std::fs::remove_file(self.database_path()).with_context(|| {
-                format!(
-                    "failed to remove wallet database at {}",
-                    self.database_path().display()
-                )
-            })?;
-        }
-        self.ensure_wallet_initialized_with_seed_words(&seed_words)
-            .await?;
-
         // Sync the in-memory key manager with the new seed words so that
         // subsequent offline signing uses the correct keys.
         *self.seed_words.lock().unwrap() = seed_words.clone();
         *self.key_manager.lock().unwrap() = Self::build_key_manager(&seed_words)?;
 
+        // Use existing wallet database (created by --print-addresses) which already
+        // has the correct seed words and birthday. Just run re-scan on it.
         let database_path = self.database_path();
         let database_path = database_path
             .to_str()
@@ -692,6 +680,7 @@ impl WalletDriver for NewWalletDriver {
 
     async fn scan_from_genesis(&self) -> anyhow::Result<ScanMetrics> {
         // Seed birthday = 0 (genesis), rescan-from-height = 1 (height 0 is broken upstream)
+        // Use existing wallet database (created by --print-addresses) with correct keys.
         self.scan_from_height(1, 0).await
     }
 

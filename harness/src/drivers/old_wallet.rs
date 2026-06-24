@@ -86,12 +86,17 @@ impl OldWalletDriver {
 
     /// Spawn the wallet process and block until gRPC port responds or timeout
     pub async fn start(&self) -> anyhow::Result<()> {
+        self.start_with_rescan(None).await
+    }
+
+    /// Spawn the wallet process with optional --rescan-from-height
+    pub async fn start_with_rescan(&self, rescan_from_height: Option<u64>) -> anyhow::Result<()> {
         let stderr_capture = Arc::new(Mutex::new(String::new()));
         let stderr_capture_clone = stderr_capture.clone();
         let seed_words = self.seed_words.lock().unwrap().clone();
 
-        let mut child = Command::new(&self.wallet_bin)
-            .arg("--grpc-enabled")
+        let mut cmd = Command::new(&self.wallet_bin);
+        cmd.arg("--grpc-enabled")
             .arg("--grpc-address")
             .arg(format!("/ip4/127.0.0.1/tcp/{}", self.grpc_port))
             .arg("--password")
@@ -100,9 +105,13 @@ impl OldWalletDriver {
             .arg(&seed_words)
             .arg(format!("--base-path={}", self.data_dir.display()))
             .arg("--non-interactive-mode")
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| anyhow!("failed to spawn wallet process: {e}"))?;
+            .stderr(Stdio::piped());
+
+        if let Some(height) = rescan_from_height {
+            cmd.arg("--rescan-from-height").arg(height.to_string());
+        }
+
+        let mut child = cmd.spawn().map_err(|e| anyhow!("failed to spawn wallet process: {e}"))?;
 
         // Read stderr in a background thread so the pipe does not fill up
         if let Some(stderr_handle) = child.stderr.take() {
@@ -245,8 +254,6 @@ impl OldWalletDriver {
         birthday_days: u64,
         rescan_from_height: Option<u64>,
     ) -> anyhow::Result<ScanMetrics> {
-        use tari_rpc::wallet_client::WalletClient;
-        use tari_rpc::RescanWalletRequest;
 
         // 1. Stop existing process.
         self.stop();
@@ -257,30 +264,17 @@ impl OldWalletDriver {
         // 3. Set seed words with the requested birthday.
         self.set_seed_birthday(birthday_days)?;
 
-        // 4. Record pre-scan tip and start the wallet.
+        // 4. Record pre-scan tip and start the wallet with --rescan-from-height.
         let h_tip_start = self.get_base_node_tip_height().await?;
         let target_tip = h_tip_start;
-        self.start().await?;
 
-        // 5. Issue gRPC RescanWallet to trigger a blockchain scan.  The
-        //    non-zero height path works correctly upstream; for genesis scans
-        //    we use height=1 (block 0 has no user funds) because height=0 is
-        //    broken upstream and --seed-words alone no longer triggers a rescan
-        //    in recent wallet versions.
         let rescan_height = match rescan_from_height {
             Some(fh) if fh > 0 => fh,
             _ => 1,
         };
-        {
-            let mut client = WalletClient::connect(self.grpc_url.clone()).await?;
-            client
-                .rescan_wallet(RescanWalletRequest {
-                    from_height: rescan_height,
-                })
-                .await?;
-        }
+        self.start_with_rescan(Some(rescan_height)).await?;
 
-        // 6. Wait for wallet to sync to tip.
+        // 5. Wait for wallet to sync to tip.
         let pid = self
             .process
             .lock()

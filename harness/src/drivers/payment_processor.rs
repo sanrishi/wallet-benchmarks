@@ -314,7 +314,9 @@ impl PaymentProcessorDriver {
 
         let (view_key_hex, spend_key_hex) = {
             let words = self.seed_words.lock().unwrap();
-            derive_wallet_keys(&words)?
+            // Use birthday-adjusted seed words (same as create_wallet(0) uses)
+            let seed = seed_words_with_birthday(&words, 0)?;
+            derive_wallet_keys(&seed)?
         };
 
         let stderr_capture = Arc::new(Mutex::new(String::new()));
