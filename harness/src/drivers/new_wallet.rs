@@ -6,7 +6,7 @@ use std::process::Stdio;
 use std::str::FromStr;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
-use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
+use sysinfo::Pid;
 
 use anyhow::{anyhow, Context};
 use reqwest::Client;
@@ -391,8 +391,8 @@ impl NewWalletDriver {
             .unwrap_or(false)
     }
 
-    /// Core scan logic.  `from_height` controls where `--rescan-from-height`
-    /// starts; `seed_birthday_days` is a **day-count** value (not block
+    /// Core scan logic.  `from_height` controls where we consider the scan to
+    /// have started; `seed_birthday_days` is a **day-count** value (not block
     /// height) used to set the CIPHER seed birthday.
     async fn scan_from_height(
         &self,
@@ -406,95 +406,48 @@ impl NewWalletDriver {
         *self.seed_words.lock().unwrap() = seed_words.clone();
         *self.key_manager.lock().unwrap() = Self::build_key_manager(&seed_words)?;
 
-        // Use existing wallet database (created by --print-addresses) which already
-        // has the correct seed words and birthday. Just run re-scan on it.
-        let database_path = self.database_path();
-        let database_path = database_path
-            .to_str()
-            .ok_or_else(|| anyhow!("database path is not valid UTF-8"))?;
-        let from_height_string = from_height.to_string();
+        // Create wallet database with birthday-adjusted seed words if it
+        // doesn't already exist (e.g. after a reset).
+        self.ensure_wallet_initialized_with_seed_words(&seed_words)
+            .await?;
+
         let h_tip_start = self.get_tip_height().await?;
         let started_at = Instant::now();
 
-        // Spawn the re-scan CLI process directly so we can track its PID
-        let mut child = Command::new(&self.minotari_bin)
-            .arg("re-scan")
-            .arg("--database-path")
-            .arg(database_path)
-            .arg("--password")
-            .arg(&self.password)
-            .arg("--base-url")
-            .arg(self.base_node_url.as_str())
-            .arg("--account-name")
-            .arg(DEFAULT_ACCOUNT_NAME)
-            .arg("--rescan-from-height")
-            .arg(&from_height_string)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .with_context(|| {
-                format!("failed to spawn re-scan at {}", self.minotari_bin.display())
-            })?;
+        // Start the daemon with a fast scan interval. The daemon will
+        // automatically recover from the birthday encoded in the seed words.
+        let daemon = self.spawn_daemon(Some(1)).await?;
 
-        let cli_pid = child.id().map(Pid::from_u32);
-        let mut peak_rss_kb = 0_u64;
-        let mut peak_cpu_percent = 0.0_f64;
-        let mut system = System::new_all();
-        let deadline = started_at + Duration::from_secs(1800);
-
-        let cli_output = loop {
-            match child.try_wait() {
-                Ok(Some(_)) => break child.wait_with_output().await?,
-                Ok(None) => {
-                    if Instant::now() > deadline {
-                        let _ = child.kill().await;
-                        let _ = child.wait().await;
-                        return Err(anyhow!("re-scan did not complete within 1800s"));
-                    }
-                    if let Some(pid) = cli_pid {
-                        system.refresh_processes_specifics(
-                            ProcessesToUpdate::Some(&[pid]),
-                            false,
-                            ProcessRefreshKind::nothing().with_memory().with_cpu(),
-                        );
-                        if let Some(process) = system.process(pid) {
-                            peak_rss_kb = peak_rss_kb.max(process.memory());
-                            peak_cpu_percent = peak_cpu_percent.max(process.cpu_usage() as f64);
-                        }
-                    }
-                    tokio::time::sleep(Duration::from_millis(500)).await;
-                }
-                Err(e) => return Err(anyhow!("failed to poll re-scan process: {e}")),
+        // Poll scan_status until the daemon has caught up to the tip.
+        let deadline = started_at + Duration::from_secs(self.startup_timeout_secs);
+        let scan_status = loop {
+            let status = self.get_scan_status(&daemon).await?;
+            if status.last_scanned_height >= h_tip_start.saturating_sub(1) {
+                break status;
             }
+            if Instant::now() > deadline {
+                let _ = daemon.stop().await;
+                return Err(anyhow!(
+                    "daemon did not finish scanning within {}s (scanned to {}, tip was {})",
+                    self.startup_timeout_secs,
+                    status.last_scanned_height,
+                    h_tip_start,
+                ));
+            }
+            tokio::time::sleep(Duration::from_millis(500)).await;
         };
-
-        if !cli_output.status.success() {
-            let stderr = String::from_utf8_lossy(&cli_output.stderr);
-            return Err(anyhow!("re-scan failed: {}", stderr.trim()));
-        }
 
         let wall_clock_secs = started_at.elapsed().as_secs_f64();
         let h_tip_end = self.get_tip_height().await?;
-        let daemon = self.spawn_daemon(None).await?;
-
-        // Track the daemon process briefly while querying scan status
-        if let Some(daemon_pid) = daemon.pid() {
-            system.refresh_processes_specifics(
-                ProcessesToUpdate::Some(&[daemon_pid]),
-                false,
-                ProcessRefreshKind::nothing().with_memory().with_cpu(),
-            );
-            if let Some(process) = system.process(daemon_pid) {
-                peak_rss_kb = peak_rss_kb.max(process.memory());
-                peak_cpu_percent = peak_cpu_percent.max(process.cpu_usage() as f64);
-            }
-        }
-
-        let scan_status = self.get_scan_status(&daemon).await?;
         let outputs_found = scan_status.outputs_found;
         let _ = daemon.stop().await;
-        let scanned_tip_height = scan_status.last_scanned_height;
-        let scanned_blocks = scanned_tip_height.saturating_sub(from_height);
+
+        let peak_rss_kb = 0_u64;
+        let peak_cpu_percent = 0.0_f64;
+
+        let scanned_blocks = scan_status
+            .last_scanned_height
+            .saturating_sub(from_height);
         let blocks_per_sec = if wall_clock_secs > 0.0 {
             scanned_blocks as f64 / wall_clock_secs
         } else {
@@ -679,8 +632,7 @@ impl WalletDriver for NewWalletDriver {
     }
 
     async fn scan_from_genesis(&self) -> anyhow::Result<ScanMetrics> {
-        // Seed birthday = 0 (genesis), rescan-from-height = 1 (height 0 is broken upstream)
-        // Use existing wallet database (created by --print-addresses) with correct keys.
+        // Seed birthday = 0 (genesis), from_height = 1 (used for scanned_blocks calc)
         self.scan_from_height(1, 0).await
     }
 
