@@ -252,6 +252,61 @@ mod tests {
         assert!(derive_wallet_keys("not valid seed words").is_err());
     }
 
+    /// Verify the derived view key is a valid canonical Ristretto secret key.
+    /// This mirrors the PP daemon's parse_view_key logic:
+    ///   hex::decode → RistrettoSecretKey::from_canonical_bytes
+    #[test]
+    fn derive_wallet_keys_view_key_is_valid_canonical_scalar() {
+        use tari_common_types::types::PrivateKey;
+        use tari_utilities::byte_array::ByteArray;
+
+        let dir = tempfile::TempDir::new().unwrap();
+        let words = load_or_create_seed_words(dir.path(), None).unwrap();
+        let mnemonic = SeedWords::from_str(&words).unwrap();
+        let cipher_seed = CipherSeed::from_mnemonic(&mnemonic, None).unwrap();
+        let wallet = WalletType::SeedWords(
+            SeedWordsWallet::construct_new(cipher_seed).unwrap(),
+        );
+        let private_view_key = wallet.get_view_key();
+
+        // get_view_key() returns &PrivateKey (&RistrettoSecretKey)
+        // as_bytes() returns the canonical 32-byte representation
+        let raw_bytes = private_view_key.as_bytes();
+        assert_eq!(raw_bytes.len(), 32, "view key bytes must be 32");
+
+        // This is exactly what the PP daemon does:
+        // hex::decode → RistrettoSecretKey::from_canonical_bytes
+        // PrivateKey is a type alias for RistrettoSecretKey.
+        let reconstructed = PrivateKey::from_canonical_bytes(raw_bytes);
+        assert!(
+            reconstructed.is_ok(),
+            "view key bytes must form a valid canonical Ristretto scalar: {:?}",
+            reconstructed.err()
+        );
+
+        // Also verify the hex format is correct (exactly 64 hex chars)
+        let hex_str = raw_bytes.iter().map(|b| format!("{b:02x}")).collect::<String>();
+        assert_eq!(hex_str.len(), 64, "hex must be exactly 64 chars");
+        assert!(hex_str.chars().all(|c| c.is_ascii_hexdigit()), "hex must contain only hex chars");
+    }
+
+    /// Verify that birthday adjustment does NOT change the derived keys.
+    /// The keys depend only on cipher entropy, not the birthday field.
+    #[test]
+    fn derive_wallet_keys_are_same_after_birthday_change() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let words = load_or_create_seed_words(dir.path(), None).unwrap();
+
+        let (vk0, sk0) = derive_wallet_keys(&words).unwrap();
+
+        // Change birthday and re-derive — keys should be identical
+        let words_birthday_0 = seed_words_with_birthday(&words, 0).unwrap();
+        let (vk1, sk1) = derive_wallet_keys(&words_birthday_0).unwrap();
+
+        assert_eq!(vk0, vk1, "view key must not change with birthday adjustment");
+        assert_eq!(sk0, sk1, "spend key must not change with birthday adjustment");
+    }
+
     // ── load_or_create_seed_words ────────────────────────────────────
 
     #[test]
