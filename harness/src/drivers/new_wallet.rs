@@ -419,10 +419,13 @@ impl NewWalletDriver {
         let daemon = self.spawn_daemon(Some(1)).await?;
 
         // Poll scan_status until the daemon has caught up to the tip.
+        // Allow a tolerance of 50 blocks — the testnet produces ~1 block/min and
+        // the daemon may not fully catch up within the timeout on a slow network.
+        const SCAN_TOLERANCE: u64 = 50;
         let deadline = started_at + Duration::from_secs(self.startup_timeout_secs);
         let scan_status = loop {
             let status = self.get_scan_status(&daemon).await?;
-            if status.last_scanned_height >= h_tip_start.saturating_sub(1) {
+            if status.last_scanned_height >= h_tip_start.saturating_sub(SCAN_TOLERANCE) {
                 break status;
             }
             if Instant::now() > deadline {
@@ -551,7 +554,7 @@ impl NewWalletDriver {
             Network::Esmeralda,
             unsigned_tx,
         )
-        .context("failed to offline-sign locked transaction")?;
+        .map_err(|e| anyhow!("failed to offline-sign locked transaction: {e:?}"))?;
         let construction_secs = construction_started.elapsed().as_secs_f64();
 
         let tx_id = signed.signed_transaction.tx_id.to_string();
