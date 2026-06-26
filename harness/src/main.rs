@@ -329,6 +329,39 @@ async fn run_new_wallet(config: &Config) -> (String, Vec<ScenarioResult>) {
     }
 }
 
+async fn run_single_scenario(config: &Config, name: &str) -> anyhow::Result<()> {
+    let new_wallet = NewWalletDriver::new(
+        require_nonempty_path("minotari_bin", &config.paths.minotari_bin)?,
+        require_nonempty_path("new_wallet", &config.data.new_wallet)?,
+        config.network.base_node_http_url.clone(),
+        config.benchmark.c_min,
+        config.benchmark.startup_timeout_secs,
+        config.passwords.new_wallet.clone(),
+        config_seed_for(config, "new_wallet"),
+        require_nonempty_path("console_wallet_bin", &config.paths.console_wallet_bin)?,
+    )?;
+    if let Ok(addr) = new_wallet.get_self_address().await {
+        println!("new_wallet address: {addr}");
+    }
+
+    println!("Running B0 (scan)...");
+    let _b0 = run_b0(&new_wallet).await.map_err(|e| {
+        eprintln!("B0 failed: {e}");
+        e
+    })?;
+
+    let result = match name {
+        "S0" => run_s0(&new_wallet, config).await?,
+        "S1" => run_s1(&new_wallet, config).await?,
+        "S4" => run_s4(&new_wallet, config).await?,
+        "S5" => run_s5(&new_wallet, config).await?,
+        other => anyhow::bail!("unsupported single scenario: {other} (use S0, S1, S4, or S5)"),
+    };
+
+    println!("{} result: {}", name, serde_json::to_string_pretty(&result)?);
+    Ok(())
+}
+
 #[cfg(feature = "library_wallet")]
 async fn run_library_wallet(config: &Config) -> (String, Vec<ScenarioResult>) {
     let library_wallet = (|| -> anyhow::Result<LibraryWalletDriver> {
@@ -372,6 +405,7 @@ async fn main() -> anyhow::Result<()> {
     let args = std::env::args().collect::<Vec<_>>();
     let print_addresses = args.iter().any(|arg| arg == "--print-addresses");
     let use_library_wallet = args.iter().any(|arg| arg == "--library-wallet");
+    let scenario_name = args.iter().skip_while(|a| a.as_str() != "--scenario").nth(1).cloned();
     let config_path = args
         .iter()
         .skip_while(|a| a.as_str() != "--config")
@@ -386,6 +420,10 @@ async fn main() -> anyhow::Result<()> {
     if print_addresses {
         print_all_wallet_addresses(&config, use_library_wallet).await?;
         return Ok(());
+    }
+
+    if let Some(ref name) = scenario_name {
+        return run_single_scenario(&config, name).await;
     }
 
     let config_snapshot = serde_json::to_value(&config).context("failed to serialize config")?;
