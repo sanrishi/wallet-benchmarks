@@ -16,11 +16,7 @@ use crate::drivers::shared;
 use crate::drivers::shared::seed_words_with_birthday;
 use crate::metrics::{ScanMetrics, TxMetrics};
 
-// Include tonic-generated gRPC types from wallet.proto
-#[allow(dead_code, clippy::doc_overindented_list_items)]
-pub mod tari_rpc {
-    tonic::include_proto!("tari.rpc");
-}
+use crate::drivers::tari_rpc;
 
 pub struct OldWalletDriver {
     pub wallet_bin: PathBuf,

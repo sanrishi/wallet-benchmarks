@@ -11,10 +11,10 @@ use anyhow::Context;
 use config::Config;
 use driver::WalletDriver;
 use drivers::new_wallet::NewWalletDriver;
-use drivers::old_wallet::OldWalletDriver;
-use drivers::payment_processor::PaymentProcessorDriver;
 #[cfg(feature = "library_wallet")]
 use drivers::library_wallet::LibraryWalletDriver;
+use drivers::old_wallet::OldWalletDriver;
+use drivers::payment_processor::PaymentProcessorDriver;
 use metrics::{BenchmarkReport, ScenarioResult};
 use scenarios::*;
 use sysinfo::System;
@@ -159,6 +159,7 @@ async fn print_all_wallet_addresses(config: &Config, use_library_wallet: bool) -
             config.benchmark.startup_timeout_secs,
             config.passwords.new_wallet.clone(),
             config_seed_for(config, "new_wallet"),
+            require_nonempty_path("console_wallet_bin", &config.paths.console_wallet_bin)?,
         )?;
         println!("new_wallet: {}", new_wallet.get_self_address().await?);
     }
@@ -303,6 +304,7 @@ async fn run_new_wallet(config: &Config) -> (String, Vec<ScenarioResult>) {
             config.benchmark.startup_timeout_secs,
             config.passwords.new_wallet.clone(),
             config_seed_for(config, "new_wallet"),
+            require_nonempty_path("console_wallet_bin", &config.paths.console_wallet_bin)?,
         )?)
     })();
     match new_wallet {
