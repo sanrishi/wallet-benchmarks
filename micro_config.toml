@@ -1,0 +1,42 @@
+[benchmark]
+a_fund = 100000
+c_min = 3
+volume_target = 2
+doubling_rounds = 1
+fanout_outputs_per_tx = 0
+concurrent_batches = [1]
+s4_t_budget_secs = 120
+s5_m = 1
+s5_k = 1
+tx_amount_ut = 200
+fee_rate = "1"
+scan_interval_secs = 1
+startup_timeout_secs = 120
+confirmation_timeout_secs = 600
+
+[paths]
+wallet_bin = ""
+minotari_bin = ""
+payment_processor_bin = ""
+console_wallet_bin = ""
+
+[network]
+base_node_grpc_url = "http://rpc.esmeralda.tari.com:18142"
+base_node_http_url = "http://rpc.esmeralda.tari.com:18142"
+grpc_port = 18143
+
+[passwords]
+old_wallet = "benchmark123"
+new_wallet = "benchmark_mode2_password_32_chars"
+payment_processor = "benchmark_mode3_password_32_chars"
+library_wallet = "benchmark_lib_password_32_chars"
+
+[data]
+old_wallet = "./wallet-data"
+new_wallet = "./wallet-data-new"
+payment_processor = "./wallet-data-pp"
+
+[versions]
+console_wallet = "5.3.1"
+minotari_cli = "5.3.1"
+base_node = "5.3.1"
