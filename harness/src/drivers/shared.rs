@@ -130,7 +130,7 @@ pub async fn get_tip_height(_http_client: &Client, base_node_url: &str) -> anyho
         .await
         .context("failed to connect to base node gRPC for get_tip_info")?;
     let tip = client
-        .get_tip_info(tonic::Request::new(()))
+        .get_tip_info(tonic::Request::new(tari_rpc::Empty {}))
         .await
         .context("failed to call base node get_tip_info")?
         .into_inner();
