@@ -548,6 +548,10 @@ impl NewWalletDriver {
             .to_str()
             .ok_or_else(|| anyhow!("database path is not valid UTF-8"))?;
 
+        let data_dir_str = self
+            .data_dir
+            .to_str()
+            .ok_or_else(|| anyhow!("data dir is not valid UTF-8"))?;
         let mut child = Command::new(&self.console_wallet_bin)
             .arg("--grpc-enabled")
             .arg("--grpc-address")
@@ -556,7 +560,8 @@ impl NewWalletDriver {
             .arg(&self.password)
             .arg("--seed-words")
             .arg(&seed_words)
-            .arg(format!("--base-path={}", db_str))
+            .arg("--base-path")
+            .arg(data_dir_str)
             .arg("--non-interactive-mode")
             .stderr(Stdio::piped())
             .spawn()
