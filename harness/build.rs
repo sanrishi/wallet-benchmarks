@@ -3,6 +3,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::env::set_var("PROTOC", protoc_path);
     tonic_build::configure()
         .build_server(false)
-        .compile_protos(&["proto/wallet.proto"], &["proto/"])?;
+        .compile_protos(&["proto/wallet.proto", "proto/base_node.proto"], &["proto/"])?;
     Ok(())
 }

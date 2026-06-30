@@ -123,31 +123,18 @@ pub fn derive_wallet_keys(seed_words: &str) -> anyhow::Result<(String, String)> 
     Ok((private_view_key_hex, spend_key_hex))
 }
 
-/// Query the base node for the current chain tip height.
-pub async fn get_tip_height(http_client: &Client, base_node_url: &str) -> anyhow::Result<u64> {
-    let url = format!("{}/get_tip_info", base_node_url.trim_end_matches('/'));
-    let tip: TipInfoResponse = http_client
-        .get(url)
-        .send()
+/// Query the base node for the current chain tip height via gRPC.
+pub async fn get_tip_height(_http_client: &Client, base_node_url: &str) -> anyhow::Result<u64> {
+    use crate::drivers::tari_rpc;
+    let mut client = tari_rpc::base_node_client::BaseNodeClient::connect(base_node_url.to_string())
         .await
-        .context("failed to query get_tip_info")?
-        .error_for_status()
-        .context("base node returned an HTTP error on get_tip_info")?
-        .json()
+        .context("failed to connect to base node gRPC for get_tip_info")?;
+    let tip = client
+        .get_tip_info(tonic::Request::new(()))
         .await
-        .context("failed to parse get_tip_info response")?;
-    Ok(tip.metadata.best_block_height)
-}
-
-/// Response from the base-node `/get_tip_info` HTTP endpoint.
-#[derive(Debug, Deserialize)]
-pub struct TipInfoResponse {
-    pub metadata: TipMetadata,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct TipMetadata {
-    pub best_block_height: u64,
+        .context("failed to call base node get_tip_info")?
+        .into_inner();
+    Ok(tip.metadata.context("get_tip_info returned no metadata")?.best_block_height)
 }
 
 #[cfg(test)]
@@ -420,115 +407,5 @@ mod tests {
         assert_eq!(a, b, "same birthday must produce identical seed encoding");
     }
 
-    // ── wiremock: get_tip_height HTTP client ─────────────────────────
-
-    use wiremock::matchers::{method, path};
-    use wiremock::{Mock, MockServer, ResponseTemplate};
-
-    async fn mock_tip_server(height: u64) -> MockServer {
-        let server = MockServer::start().await;
-        Mock::given(method("GET"))
-            .and(path("/get_tip_info"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
-                "metadata": { "best_block_height": height }
-            })))
-            .mount(&server)
-            .await;
-        server
-    }
-
-    #[tokio::test]
-    async fn get_tip_height_returns_height() {
-        let server = mock_tip_server(123_456).await;
-        let client = reqwest::Client::new();
-        let height = get_tip_height(&client, &server.uri()).await.unwrap();
-        assert_eq!(height, 123_456);
-    }
-
-    #[tokio::test]
-    async fn get_tip_height_zero_returns_zero() {
-        let server = mock_tip_server(0).await;
-        let client = reqwest::Client::new();
-        let height = get_tip_height(&client, &server.uri()).await.unwrap();
-        assert_eq!(height, 0);
-    }
-
-    #[tokio::test]
-    async fn get_tip_height_large_height() {
-        let server = mock_tip_server(9_999_999).await;
-        let client = reqwest::Client::new();
-        let height = get_tip_height(&client, &server.uri()).await.unwrap();
-        assert_eq!(height, 9_999_999);
-    }
-
-    #[tokio::test]
-    async fn get_tip_height_errors_on_404() {
-        let server = MockServer::start().await;
-        Mock::given(method("GET"))
-            .and(path("/get_tip_info"))
-            .respond_with(ResponseTemplate::new(404))
-            .mount(&server)
-            .await;
-        let client = reqwest::Client::new();
-        let result = get_tip_height(&client, &server.uri()).await;
-        assert!(result.is_err(), "expected error for 404 response");
-    }
-
-    #[tokio::test]
-    async fn get_tip_height_errors_on_bad_json() {
-        let server = MockServer::start().await;
-        Mock::given(method("GET"))
-            .and(path("/get_tip_info"))
-            .respond_with(ResponseTemplate::new(200).set_body_string("not json"))
-            .mount(&server)
-            .await;
-        let client = reqwest::Client::new();
-        let result = get_tip_height(&client, &server.uri()).await;
-        assert!(result.is_err(), "expected error for bad JSON");
-    }
-
-    #[tokio::test]
-    async fn get_tip_height_errors_on_missing_field() {
-        let server = MockServer::start().await;
-        Mock::given(method("GET"))
-            .and(path("/get_tip_info"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
-                "metadata": {}
-            })))
-            .mount(&server)
-            .await;
-        let client = reqwest::Client::new();
-        let result = get_tip_height(&client, &server.uri()).await;
-        assert!(result.is_err(), "expected error when best_block_height is missing");
-    }
-
-    #[tokio::test]
-    async fn get_tip_height_errors_on_server_error() {
-        let server = MockServer::start().await;
-        Mock::given(method("GET"))
-            .and(path("/get_tip_info"))
-            .respond_with(ResponseTemplate::new(500))
-            .mount(&server)
-            .await;
-        let client = reqwest::Client::new();
-        let result = get_tip_height(&client, &server.uri()).await;
-        assert!(result.is_err(), "expected error for 500 response");
-    }
-
-    #[tokio::test]
-    async fn get_tip_height_errors_on_timeout() {
-        let server = MockServer::start().await;
-        Mock::given(method("GET"))
-            .and(path("/get_tip_info"))
-            .respond_with(ResponseTemplate::new(200).set_delay(std::time::Duration::from_secs(10)))
-            .mount(&server)
-            .await;
-        let client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_millis(100))
-            .build()
-            .unwrap();
-        let result = get_tip_height(&client, &server.uri()).await;
-        assert!(result.is_err(), "expected error for timeout");
-    }
 }
 

@@ -62,6 +62,8 @@ impl NewWalletDriver {
         }
         Self::validate_console_wallet_binary(&console_wallet_bin)?;
 
+        std::fs::create_dir_all(&data_dir)
+            .with_context(|| format!("failed to create new_wallet data directory {}", data_dir.display()))?;
         let seed_words = Mutex::new(Self::load_or_create_seed_words(&data_dir, config_seed.as_deref())?);
         let grpc_port = Mutex::new(Self::find_free_api_port()?);
 
