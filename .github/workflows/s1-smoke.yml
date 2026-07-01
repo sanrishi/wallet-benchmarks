@@ -44,50 +44,37 @@ jobs:
           sed -i "s|payment_processor_bin = \"\"|payment_processor_bin = \"$ABS_TOOLS/minotari_payment_processor\"|" micro_config.toml
           sed -i "s|console_wallet_bin = \"\"|console_wallet_bin = \"$ABS_TOOLS/minotari_console_wallet\"|" micro_config.toml
 
-      - name: Start base node (with PTY to avoid crossterm crash)
+      - name: Start base node and wait for sync
         run: |
-          # Create a PTY so the node's interactive console works without a real TTY
-          which script || apt-get update -qq && apt-get install -y -qq bsdmainutils 2>/dev/null
-          script -q -c "./tools/minotari_node --network esmeralda --grpc-enabled \
+          # Start node in non-interactive mode (works without TTY)
+          ./tools/minotari_node --network esmeralda --grpc-enabled \
             --grpc-address /ip4/127.0.0.1/tcp/18142 \
-            -p base_node.grpc_server_allow_methods=\"\" \
-            -p base_node.mining_enabled=true" \
-            /tmp/node.log > /dev/null 2>&1 &
-          NODE_PID=$!
-          echo "Node PID: $NODE_PID"
-          sleep 20
-          ps aux | grep minotari_node | grep -v grep || { echo "Node NOT running!"; exit 1; }
-          echo "--- Node log (first 10 lines) ---"
-          head -10 /tmp/node.log 2>/dev/null
+            --non-interactive-mode \
+            -p base_node.grpc_server_allow_methods="" \
+            -p base_node.mining_enabled=true \
+            > /tmp/node.log 2>&1 &
+          echo "Node PID: $!"
+          sleep 30
 
-      - name: Wait for node sync (parse log for progress)
-        run: |
-          echo "Waiting for node to sync headers..."
-          for i in $(seq 1 300); do
-            # Parse the last line showing sync progress (e.g. "185732/722736 (25%)")
-            LINE=$(grep -oP 'Syncing headers:.*?\d+/\d+' /tmp/node.log | tail -1)
-            if [ -n "$LINE" ]; then
-              HEIGHTS=$(echo "$LINE" | grep -oP '\d+/\d+' | tail -1)
-              CURRENT=$(echo "$HEIGHTS" | cut -d/ -f1)
-              TOTAL=$(echo "$HEIGHTS" | cut -d/ -f2)
-              PCT=$((CURRENT * 100 / TOTAL))
-              echo "[$i] $CURRENT/$TOTAL ($PCT%) — $(tail -1 /tmp/node.log)"
-              if [ "$PCT" -ge 95 ] 2>/dev/null; then
-                echo "Header sync past 95%, proceeding..."
-                break
-              fi
-            else
-              # Show whatever the latest log line is
-              echo "[$i] $(tail -1 /tmp/node.log)"
-            fi
-            ps aux | grep minotari_node | grep -v grep || {
-              echo "Node crashed!"; tail -30 /tmp/node.log; exit 1
-            }
+          # Check node is alive
+          ps aux | grep minotari_node | grep -v grep || {
+            echo "Node NOT running:"; tail -30 /tmp/node.log; exit 1
+          }
+          echo "Node is running. Waiting 3 hours for sync..."
+
+          # Wait 3 hours checking node health every 5 minutes
+          for m in $(seq 1 180); do
             sleep 60
+            if [ $((m % 5)) -eq 0 ]; then
+              echo "  ${m}m elapsed, checking node..."
+              ps aux | grep minotari_node | grep -v grep || {
+                echo "Node crashed at ${m}m!"; tail -30 /tmp/node.log; exit 1
+              }
+              tail -3 /tmp/node.log
+            fi
           done
-          echo "--- Final tail ---"
-          tail -10 /tmp/node.log
-          set -e
+          echo "Sync window complete. Proceeding..."
+          tail -5 /tmp/node.log
 
       - name: Build harness
         run: cargo build --release --manifest-path harness/Cargo.toml
