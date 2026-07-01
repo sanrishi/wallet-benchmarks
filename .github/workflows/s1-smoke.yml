@@ -44,71 +44,49 @@ jobs:
           sed -i "s|payment_processor_bin = \"\"|payment_processor_bin = \"$ABS_TOOLS/minotari_payment_processor\"|" micro_config.toml
           sed -i "s|console_wallet_bin = \"\"|console_wallet_bin = \"$ABS_TOOLS/minotari_console_wallet\"|" micro_config.toml
 
-      - name: Start base node
+      - name: Start base node (with PTY to avoid crossterm crash)
         run: |
-          ./tools/minotari_node --network esmeralda --grpc-enabled \
+          # Create a PTY so the node's interactive console works without a real TTY
+          which script || apt-get update -qq && apt-get install -y -qq bsdmainutils 2>/dev/null
+          script -q -c "./tools/minotari_node --network esmeralda --grpc-enabled \
             --grpc-address /ip4/127.0.0.1/tcp/18142 \
-            --non-interactive-mode \
-            -p base_node.grpc_server_allow_methods="" \
-            -p base_node.mining_enabled=true \
-            > /tmp/node.log 2>&1 &
-          echo "Node PID: $!"
-          sleep 30
-          ps aux | grep minotari_node | grep -v grep || echo "Node NOT running"
-          echo "--- Last 10 log lines ---"
-          tail -10 /tmp/node.log 2>/dev/null || echo "(log empty)"
+            -p base_node.grpc_server_allow_methods=\"\" \
+            -p base_node.mining_enabled=true" \
+            /tmp/node.log > /dev/null 2>&1 &
+          NODE_PID=$!
+          echo "Node PID: $NODE_PID"
+          sleep 20
+          ps aux | grep minotari_node | grep -v grep || { echo "Node NOT running!"; exit 1; }
+          echo "--- Node log (first 10 lines) ---"
+          head -10 /tmp/node.log 2>/dev/null
 
-      - name: Wait for node gRPC to become available
+      - name: Wait for node sync (parse log for progress)
         run: |
-          echo "Waiting for gRPC port 18142..."
-          for i in $(seq 1 60); do
-            ss -tlnp 2>/dev/null | grep -q ':18142\b' && { echo "gRPC port ready!"; break; }
-            # Fallback: check with timeout
-            timeout 1 bash -c 'echo > /dev/tcp/127.0.0.1/18142' 2>/dev/null && { echo "gRPC port ready!"; break; }
-            ps aux | grep minotari_node | grep -v grep || {
-              echo "Node crashed!"
-              tail -30 /tmp/node.log
-              exit 1
-            }
-            echo "  waiting... (attempt $i)"
-            sleep 5
-          done
-
-      - name: Wait for node sync (poll gRPC tip info)
-        run: |
-          # Install grpcurl
-          curl -sL "https://github.com/fullstorydev/grpcurl/releases/download/v1.9.3/grpcurl_1.9.3_linux_x86_64.tar.gz" -o /tmp/grpcurl.tar.gz
-          tar xzf /tmp/grpcurl.tar.gz -C /tmp
-          chmod +x /tmp/grpcurl
-
-          set +e
+          echo "Waiting for node to sync headers..."
           for i in $(seq 1 300); do
-            # Query tip info via gRPC
-            TIP_JSON=$(/tmp/grpcurl -plaintext -d '' 127.0.0.1:18142 tari.rpc.BaseNode/GetTipInfo 2>/dev/null)
-            TIP_HEIGHT=$(echo "$TIP_JSON" | grep -oP '"best_block_height":\s*\K[0-9]+')
-            SYNC_PROGRESS=$(echo "$TIP_JSON" | grep -oP '"sync_progress":\s*\{\s*"local_height":\s*\K[0-9]+')
-            echo "[$i] Best block: $TIP_HEIGHT | Local sync: $SYNC_PROGRESS"
-
-            # Check if node is syncing or has synced
-            if [ -n "$TIP_HEIGHT" ] && [ "$TIP_HEIGHT" -gt 1000 ] 2>/dev/null; then
-              # Tip is beyond genesis — node is connected and syncing
-              # Wait until tip passes 700000
-              if [ "$TIP_HEIGHT" -ge 700000 ] 2>/dev/null; then
-                echo "Sync complete at height $TIP_HEIGHT!"
+            # Parse the last line showing sync progress (e.g. "185732/722736 (25%)")
+            LINE=$(grep -oP 'Syncing headers:.*?\d+/\d+' /tmp/node.log | tail -1)
+            if [ -n "$LINE" ]; then
+              HEIGHTS=$(echo "$LINE" | grep -oP '\d+/\d+' | tail -1)
+              CURRENT=$(echo "$HEIGHTS" | cut -d/ -f1)
+              TOTAL=$(echo "$HEIGHTS" | cut -d/ -f2)
+              PCT=$((CURRENT * 100 / TOTAL))
+              echo "[$i] $CURRENT/$TOTAL ($PCT%) — $(tail -1 /tmp/node.log)"
+              if [ "$PCT" -ge 95 ] 2>/dev/null; then
+                echo "Header sync past 95%, proceeding..."
                 break
               fi
+            else
+              # Show whatever the latest log line is
+              echo "[$i] $(tail -1 /tmp/node.log)"
             fi
-
             ps aux | grep minotari_node | grep -v grep || {
-              echo "Node crashed!"
-              tail -20 /tmp/node.log
-              exit 1
+              echo "Node crashed!"; tail -30 /tmp/node.log; exit 1
             }
-
-            # Also show node log for progress context
-            grep -oP 'Syncing headers:.*\d+/\d+' /tmp/node.log | tail -1 || echo "(no sync line in log)"
             sleep 60
           done
+          echo "--- Final tail ---"
+          tail -10 /tmp/node.log
           set -e
 
       - name: Build harness
