@@ -15,3 +15,7 @@ wallet-data-pp/
 
 # Unrelated daemon sample config
 /config
+
+# Locally built/binary tools
+/minotari-cli
+/tools

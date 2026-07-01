@@ -1,0 +1,90 @@
+name: S1 Smoke Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/harness-implementation]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  s1-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Download and extract Tari suite
+        run: |
+          curl -fL -o /tmp/tari_suite.zip \
+            "https://github.com/tari-project/tari/releases/download/v5.3.1/tari_suite-5.3.1-esme-bc0e4f2-linux-x86_64.zip"
+          mkdir -p tools
+          unzip -o /tmp/tari_suite.zip -d tools/
+          chmod +x tools/minotari_*
+
+      - name: Configure binary paths
+        run: |
+          ABS_TOOLS="$(pwd)/tools"
+          sed -i "s|wallet_bin = \"\"|wallet_bin = \"$ABS_TOOLS/minotari_console_wallet\"|" micro_config.toml
+          sed -i "s|minotari_bin = \"\"|minotari_bin = \"$ABS_TOOLS/minotari\"|" micro_config.toml
+          sed -i "s|payment_processor_bin = \"\"|payment_processor_bin = \"$ABS_TOOLS/minotari_payment_processor\"|" micro_config.toml
+          sed -i "s|console_wallet_bin = \"\"|console_wallet_bin = \"$ABS_TOOLS/minotari_console_wallet\"|" micro_config.toml
+
+      - name: Start base node
+        run: |
+          ./tools/minotari_node --network esmeralda --grpc-enabled \
+            --grpc-address /ip4/127.0.0.1/tcp/18142 \
+            -p base_node.grpc_server_allow_methods="" \
+            -p base_node.mining_enabled=true \
+            > /tmp/node.log 2>&1 &
+          echo "Node PID: $!"
+
+      - name: Wait for base node sync
+        run: |
+          echo "Waiting for base node to start..."
+          sleep 10
+          echo "Waiting for base node to sync to tip ≥ 700000..."
+          for i in $(seq 1 600); do
+            TIP_HEIGHT=$(curl -s --connect-timeout 3 \
+              -X POST -H "Content-Type: application/json" \
+              -d '{"jsonrpc":"2.0","id":1,"method":"get_tip_info","params":[]}' \
+              http://127.0.0.1:18142/json_rpc 2>/dev/null \
+              | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('result',{}).get('metadata',{}).get('best_block_height',0))" 2>/dev/null || echo "0")
+            echo "Tip height: $TIP_HEIGHT"
+            if [ "$TIP_HEIGHT" -ge 700000 ] 2>/dev/null; then
+              echo "Sync complete!"
+              break
+            fi
+            sleep 60
+          done
+
+      - name: Build harness
+        run: cargo build --release --manifest-path harness/Cargo.toml
+
+      - name: Run S1 scenario
+        id: s1
+        continue-on-error: true
+        run: |
+          cd harness
+          cargo run --release -- --config ../micro_config.toml --scenario S1 2>&1 | tee /tmp/s1_output.txt
+
+      - name: Upload result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: s1-result
+          path: /tmp/s1_output.txt
+          retention-days: 30
