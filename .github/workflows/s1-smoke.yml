@@ -55,19 +55,30 @@ jobs:
       - name: Wait for base node sync
         run: |
           echo "Waiting for base node to start..."
-          sleep 10
-          echo "Waiting for base node to sync to tip ≥ 700000..."
-          for i in $(seq 1 600); do
-            TIP_HEIGHT=$(curl -s --connect-timeout 3 \
-              -X POST -H "Content-Type: application/json" \
-              -d '{"jsonrpc":"2.0","id":1,"method":"get_tip_info","params":[]}' \
-              http://127.0.0.1:18142/json_rpc 2>/dev/null \
-              | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('result',{}).get('metadata',{}).get('best_block_height',0))" 2>/dev/null || echo "0")
+          sleep 15
+          echo "Waiting for base node to sync headers (checking log for height)..."
+
+          # Install grpcurl for gRPC queries
+          curl -sL "https://github.com/fullstorydev/grpcurl/releases/download/v1.9.3/grpcurl_1.9.3_linux_x86_64.tar.gz" \
+            -o /tmp/grpcurl.tar.gz
+          tar xzf /tmp/grpcurl.tar.gz -C /tmp
+          chmod +x /tmp/grpcurl
+
+          for i in $(seq 1 300); do
+            # Try gRPC query for tip info
+            TIP_HEIGHT=$(/tmp/grpcurl -plaintext -d '' \
+              127.0.0.1:18142 tari.rpc.BaseNode/GetTipInfo \
+              2>/dev/null \
+              | grep -oP '"best_block_height":\s*\K[0-9]+' || echo "0")
             echo "Tip height: $TIP_HEIGHT"
+
             if [ "$TIP_HEIGHT" -ge 700000 ] 2>/dev/null; then
               echo "Sync complete!"
               break
             fi
+
+            # Also show log progress
+            tail -1 /tmp/node.log 2>/dev/null | grep -oP '(Syncing headers|Syncing blocks|Listening).*' || true
             sleep 60
           done
 
