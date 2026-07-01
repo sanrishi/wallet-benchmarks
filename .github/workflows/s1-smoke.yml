@@ -34,6 +34,7 @@ jobs:
           mkdir -p tools
           unzip -o /tmp/tari_suite.zip -d tools/
           chmod +x tools/minotari_*
+          ls -la tools/
 
       - name: Configure binary paths
         run: |
@@ -51,36 +52,47 @@ jobs:
             -p base_node.mining_enabled=true \
             > /tmp/node.log 2>&1 &
           echo "Node PID: $!"
+          sleep 30
+          ps aux | grep minotari_node | grep -v grep || echo "Node NOT running"
+          echo "--- Last 10 log lines ---"
+          tail -10 /tmp/node.log 2>/dev/null || echo "(log empty)"
 
-      - name: Wait for base node sync
+      - name: Wait for node to sync (checking log every 60s)
         run: |
-          echo "Waiting for base node to start..."
-          sleep 15
-          echo "Waiting for base node to sync headers (checking log for height)..."
-
-          # Install grpcurl for gRPC queries
-          curl -sL "https://github.com/fullstorydev/grpcurl/releases/download/v1.9.3/grpcurl_1.9.3_linux_x86_64.tar.gz" \
-            -o /tmp/grpcurl.tar.gz
-          tar xzf /tmp/grpcurl.tar.gz -C /tmp
-          chmod +x /tmp/grpcurl
-
+          set +e
           for i in $(seq 1 300); do
-            # Try gRPC query for tip info
-            TIP_HEIGHT=$(/tmp/grpcurl -plaintext -d '' \
-              127.0.0.1:18142 tari.rpc.BaseNode/GetTipInfo \
-              2>/dev/null \
-              | grep -oP '"best_block_height":\s*\K[0-9]+' || echo "0")
-            echo "Tip height: $TIP_HEIGHT"
+            LINE=$(tail -1 /tmp/node.log 2>/dev/null)
+            echo "[$i] $LINE"
 
-            if [ "$TIP_HEIGHT" -ge 700000 ] 2>/dev/null; then
-              echo "Sync complete!"
-              break
+            # Extract current synced height (e.g. "145820/722736")
+            HEIGHTS=$(echo "$LINE" | grep -oP '\d+/\d+' | tail -1)
+            if [ -n "$HEIGHTS" ]; then
+              CURRENT=$(echo "$HEIGHTS" | cut -d/ -f1)
+              TOTAL=$(echo "$HEIGHTS" | cut -d/ -f2)
+              PCT=$(echo "$HEIGHTS" | awk -F/ '{printf "%.0f", $1/$2*100}')
+              echo "Progress: $CURRENT/$TOTAL ($PCT%)"
+
+              # If we've synced past 95% headers, continue — blocks sync fast
+              if [ "$CURRENT" -gt 0 ] && [ "$TOTAL" -gt 0 ] 2>/dev/null; then
+                if [ "$((CURRENT * 100 / TOTAL))" -ge 95 ] 2>/dev/null; then
+                  echo "Header sync past 95%, proceeding..."
+                  break
+                fi
+              fi
             fi
 
-            # Also show log progress
-            tail -1 /tmp/node.log 2>/dev/null | grep -oP '(Syncing headers|Syncing blocks|Listening).*' || true
+            # Check if node crashed
+            ps aux | grep minotari_node | grep -v grep || {
+              echo "Node is not running! Log tail:"
+              tail -20 /tmp/node.log
+              exit 1
+            }
+
             sleep 60
           done
+          echo "--- Final log tail ---"
+          tail -5 /tmp/node.log
+          set -e
 
       - name: Build harness
         run: cargo build --release --manifest-path harness/Cargo.toml
