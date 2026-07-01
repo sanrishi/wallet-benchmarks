@@ -48,6 +48,7 @@ jobs:
         run: |
           ./tools/minotari_node --network esmeralda --grpc-enabled \
             --grpc-address /ip4/127.0.0.1/tcp/18142 \
+            --non-interactive-mode \
             -p base_node.grpc_server_allow_methods="" \
             -p base_node.mining_enabled=true \
             > /tmp/node.log 2>&1 &
