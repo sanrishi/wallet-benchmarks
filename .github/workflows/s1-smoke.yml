@@ -60,14 +60,17 @@ jobs:
 
       - name: Wait for node gRPC to become available
         run: |
-          echo "Waiting for gRPC endpoint..."
-          for i in $(seq 1 30); do
-            curl -s --connect-timeout 2 http://127.0.0.1:18142 2>/dev/null && break
+          echo "Waiting for gRPC port 18142..."
+          for i in $(seq 1 60); do
+            ss -tlnp 2>/dev/null | grep -q ':18142\b' && { echo "gRPC port ready!"; break; }
+            # Fallback: check with timeout
+            timeout 1 bash -c 'echo > /dev/tcp/127.0.0.1/18142' 2>/dev/null && { echo "gRPC port ready!"; break; }
             ps aux | grep minotari_node | grep -v grep || {
               echo "Node crashed!"
-              tail -20 /tmp/node.log
+              tail -30 /tmp/node.log
               exit 1
             }
+            echo "  waiting... (attempt $i)"
             sleep 5
           done
 
