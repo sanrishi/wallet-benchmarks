@@ -21,15 +21,6 @@ jobs:
 
       - uses: actions-rust-lang/setup-rust-toolchain@v1
 
-      - name: Cache Cargo dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-
       - name: Download and extract Tari suite
         run: |
           curl -fL -o /tmp/tari_suite.zip \
@@ -55,6 +46,32 @@ jobs:
 
       - name: Build harness
         run: cargo build --release --manifest-path harness/Cargo.toml
+
+      - name: Start base node and wait for sync
+        run: |
+          mkdir -p node_data
+          ./tools/minotari_node --init --grpc-enabled --non-interactive --base-path node_data > /tmp/node_init.log 2>&1 &
+          NODE_PID=$!
+          echo "node_pid=$NODE_PID"
+          # Wait for gRPC to become available (port 18142)
+          for i in $(seq 1 120); do
+            if ss -tlnp | grep -q 18142; then
+              echo "Node gRPC ready after ${i}s"
+              break
+            fi
+            if [ $i -eq 120 ]; then
+              echo "Node failed to start gRPC within 120s"
+              cat /tmp/node_init.log
+              exit 1
+            fi
+            sleep 1
+          done
+          # Give it time to find peers and sync
+          echo "Waiting 300s for initial sync..."
+          for i in $(seq 1 300); do
+            sleep 1
+          done
+          echo "Sync wait done"
 
       - name: Run S1 scenario
         id: s1

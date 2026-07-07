@@ -21,8 +21,8 @@ payment_processor_bin = ""
 console_wallet_bin = ""
 
 [network]
-base_node_grpc_url = "http://grpc.tari.com:80"
-base_node_http_url = "http://grpc.tari.com:80"
+base_node_grpc_url = "http://127.0.0.1:18142"
+base_node_http_url = "http://127.0.0.1:18143"
 grpc_port = 18143
 
 [passwords]
