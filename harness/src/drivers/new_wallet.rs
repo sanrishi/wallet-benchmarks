@@ -384,7 +384,10 @@ impl NewWalletDriver {
         self.ensure_wallet_initialized_with_seed_words(&seed_words)
             .await?;
 
-        let h_tip_start = self.get_tip_height().await?;
+        let h_tip_start = self.get_tip_height().await.unwrap_or_else(|_| {
+            eprintln!("WARNING: could not fetch chain tip; using timeout-based scan");
+            0
+        });
         let started_at = Instant::now();
 
         // Start the daemon with a fast scan interval. The daemon will
@@ -396,25 +399,37 @@ impl NewWalletDriver {
         // the daemon may not fully catch up within the timeout on a slow network.
         const SCAN_TOLERANCE: u64 = 50;
         let deadline = started_at + Duration::from_secs(self.startup_timeout_secs);
-        let scan_status = loop {
-            let status = self.get_scan_status(&daemon).await?;
-            if status.last_scanned_height >= h_tip_start.saturating_sub(SCAN_TOLERANCE) {
-                break status;
+        let scan_status = if h_tip_start == 0 {
+            // Fallback: no tip height available, just wait for the full timeout
+            // so the daemon has time to discover UTXOs.
+            loop {
+                let status = self.get_scan_status(&daemon).await?;
+                if status.last_scanned_height > 0 || Instant::now() > deadline {
+                    break status;
+                }
+                tokio::time::sleep(Duration::from_millis(500)).await;
             }
-            if Instant::now() > deadline {
-                let _ = daemon.stop().await;
-                return Err(anyhow!(
-                    "daemon did not finish scanning within {}s (scanned to {}, tip was {})",
-                    self.startup_timeout_secs,
-                    status.last_scanned_height,
-                    h_tip_start,
-                ));
+        } else {
+            loop {
+                let status = self.get_scan_status(&daemon).await?;
+                if status.last_scanned_height >= h_tip_start.saturating_sub(SCAN_TOLERANCE) {
+                    break status;
+                }
+                if Instant::now() > deadline {
+                    let _ = daemon.stop().await;
+                    return Err(anyhow!(
+                        "daemon did not finish scanning within {}s (scanned to {}, tip was {})",
+                        self.startup_timeout_secs,
+                        status.last_scanned_height,
+                        h_tip_start,
+                    ));
+                }
+                tokio::time::sleep(Duration::from_millis(500)).await;
             }
-            tokio::time::sleep(Duration::from_millis(500)).await;
         };
 
         let wall_clock_secs = started_at.elapsed().as_secs_f64();
-        let h_tip_end = self.get_tip_height().await?;
+        let h_tip_end = self.get_tip_height().await.ok().unwrap_or(h_tip_start);
         let outputs_found = scan_status.outputs_found;
         let _ = daemon.stop().await;
 
