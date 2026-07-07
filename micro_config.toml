@@ -21,8 +21,8 @@ payment_processor_bin = ""
 console_wallet_bin = ""
 
 [network]
-base_node_grpc_url = "https://grpc.esmeralda.tari.com:443"
-base_node_http_url = "https://grpc.esmeralda.tari.com:443"
+base_node_grpc_url = "http://grpc.tari.com:80"
+base_node_http_url = "http://grpc.tari.com:80"
 grpc_port = 18143
 
 [passwords]
