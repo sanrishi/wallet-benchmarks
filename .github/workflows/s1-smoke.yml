@@ -11,7 +11,7 @@ env:
 jobs:
   s1-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
 
     steps:
       - uses: actions/checkout@v4
@@ -37,9 +37,9 @@ jobs:
 
       - name: Build minotari CLI from source
         run: |
-          git clone --depth 1 --branch v5.3.1 https://github.com/tari-project/tari.git /tmp/tari
-          cargo build --release --manifest-path /tmp/tari/Cargo.toml -p minotari_cli
-          cp /tmp/tari/target/release/minotari tools/
+          git clone --depth 1 https://github.com/tari-project/minotari-cli.git /tmp/minotari-cli
+          cargo build --release --manifest-path /tmp/minotari-cli/minotari/Cargo.toml
+          cp /tmp/minotari-cli/target/release/minotari tools/
           chmod +x tools/minotari
 
       - name: Configure binary paths
