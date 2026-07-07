@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use anyhow::Context;
 use reqwest::Client;
-use serde::Deserialize;
+
 use tari_common_types::seeds::{
     cipher_seed::CipherSeed,
     mnemonic::{Mnemonic, MnemonicLanguage},

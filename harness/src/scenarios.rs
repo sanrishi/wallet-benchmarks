@@ -35,8 +35,6 @@ const POLL_INTERVAL_MS: u64 = 500;
 #[allow(unused)]
 const CONFIRMATION_TIMEOUT_SECS: u64 = 300;
 
-const REDISCOVERY_TARGET: u64 = 512;
-
 pub async fn run_b0(driver: &dyn WalletDriver) -> anyhow::Result<ScenarioResult> {
     let started_at = Instant::now();
     let scan_metrics = driver.scan_from_genesis().await?;

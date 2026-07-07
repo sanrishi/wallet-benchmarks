@@ -48,7 +48,8 @@ impl NewWalletDriver {
         minotari_bin: PathBuf,
         data_dir: PathBuf,
         base_node_url: String,
-        confirmation_window: u64,
+    #[allow(dead_code)]
+    confirmation_window: u64,
         startup_timeout_secs: u64,
         password: String,
         config_seed: Option<String>,
@@ -544,7 +545,7 @@ impl NewWalletDriver {
         let port = *self.grpc_port.lock().unwrap();
         let seed_words = self.seed_words.lock().unwrap().clone();
         let db_path = self.database_path();
-        let db_str = db_path
+        let _db_str = db_path
             .to_str()
             .ok_or_else(|| anyhow!("database path is not valid UTF-8"))?;
 
@@ -765,6 +766,7 @@ impl WalletDaemon {
         &self.base_url
     }
 
+    #[allow(dead_code)]
     pub(super) fn pid(&self) -> Option<Pid> {
         self.child.id().map(Pid::from_u32)
     }
