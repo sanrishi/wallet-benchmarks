@@ -34,6 +34,7 @@ pub struct NewWalletDriver {
     pub console_wallet_bin: PathBuf,
     pub data_dir: PathBuf,
     pub base_node_url: String,
+    #[allow(dead_code)]
     confirmation_window: u64,
     startup_timeout_secs: u64,
     http_client: Client,
@@ -48,7 +49,6 @@ impl NewWalletDriver {
         minotari_bin: PathBuf,
         data_dir: PathBuf,
         base_node_url: String,
-    #[allow(dead_code)]
     confirmation_window: u64,
         startup_timeout_secs: u64,
         password: String,
