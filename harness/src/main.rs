@@ -402,6 +402,7 @@ async fn run_library_wallet(_config: &Config) -> (String, Vec::<ScenarioResult>)
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let _ = rustls::crypto::ring::default_provider().install_default();
     let args = std::env::args().collect::<Vec<_>>();
     let print_addresses = args.iter().any(|arg| arg == "--print-addresses");
     let use_library_wallet = args.iter().any(|arg| arg == "--library-wallet");
