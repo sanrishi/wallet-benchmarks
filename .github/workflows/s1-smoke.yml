@@ -50,7 +50,10 @@ jobs:
       - name: Start base node and wait for sync
         run: |
           mkdir -p node_data
-          ./tools/minotari_node --init --grpc-enabled --non-interactive --base-path node_data > /tmp/node_init.log 2>&1 &
+          ./tools/minotari_node --init --base-path node_data > /tmp/node_init.log 2>&1
+          cat /tmp/node_init.log
+          # Start node in background with gRPC
+          ./tools/minotari_node --grpc-enabled --non-interactive --base-path node_data > /tmp/node.log 2>&1 &
           NODE_PID=$!
           echo "node_pid=$NODE_PID"
           # Wait for gRPC to become available (port 18142)
@@ -61,16 +64,14 @@ jobs:
             fi
             if [ $i -eq 120 ]; then
               echo "Node failed to start gRPC within 120s"
-              cat /tmp/node_init.log
+              tail -30 /tmp/node.log
               exit 1
             fi
             sleep 1
           done
           # Give it time to find peers and sync
-          echo "Waiting 300s for initial sync..."
-          for i in $(seq 1 300); do
-            sleep 1
-          done
+          echo "Sync wait 300s..."
+          sleep 300
           echo "Sync wait done"
 
       - name: Run S1 scenario
