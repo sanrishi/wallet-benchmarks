@@ -400,11 +400,12 @@ impl NewWalletDriver {
         const SCAN_TOLERANCE: u64 = 50;
         let deadline = started_at + Duration::from_secs(self.startup_timeout_secs);
         let scan_status = if h_tip_start == 0 {
-            // Fallback: no tip height available, just wait for the full timeout
-            // so the daemon has time to discover UTXOs.
+            // Fallback: no tip height available; brief wait for the daemon
+            // to report any outputs, then proceed.
+            let fallback_deadline = Instant::now() + Duration::from_secs(30);
             loop {
                 let status = self.get_scan_status(&daemon).await?;
-                if status.last_scanned_height > 0 || Instant::now() > deadline {
+                if status.last_scanned_height > 0 || Instant::now() > fallback_deadline {
                     break status;
                 }
                 tokio::time::sleep(Duration::from_millis(500)).await;

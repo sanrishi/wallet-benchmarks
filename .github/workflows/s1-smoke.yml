@@ -47,12 +47,12 @@ jobs:
       - name: Build harness
         run: cargo build --release --manifest-path harness/Cargo.toml
 
-      - name: Start base node and wait for gRPC
+      - name: Start base node and wait for sync
         run: |
           mkdir -p node_data
-          ./tools/minotari_node --init --base-path node_data 2>&1
+          echo "n" | ./tools/minotari_node --init --base-path node_data --network esmeralda 2>&1
           echo "--- Starting node ---"
-          ./tools/minotari_node --grpc-enabled --non-interactive --base-path node_data > /tmp/node.log 2>&1 &
+          ./tools/minotari_node --grpc-enabled --non-interactive --base-path node_data --network esmeralda > /tmp/node.log 2>&1 &
           NODE_PID=$!
           echo "node_pid=$NODE_PID"
           for i in $(seq 1 60); do
@@ -67,7 +67,10 @@ jobs:
             fi
             sleep 1
           done
-          echo "Node is up, running S1 immediately"
+          echo "Waiting 180s for initial sync..."
+          sleep 180
+          echo "Sync wait done, node log tail:"
+          tail -30 /tmp/node.log
 
       - name: Run S1 scenario
         id: s1
