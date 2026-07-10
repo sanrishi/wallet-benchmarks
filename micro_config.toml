@@ -11,7 +11,7 @@ s5_k = 1
 tx_amount_ut = 200
 fee_rate = "1"
 scan_interval_secs = 1
-startup_timeout_secs = 600
+startup_timeout_secs = 1200
 confirmation_timeout_secs = 600
 
 [paths]
