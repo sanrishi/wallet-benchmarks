@@ -51,6 +51,11 @@ jobs:
         run: |
           mkdir -p node_data
           echo "n" | ./tools/minotari_node --init --base-path node_data --network esmeralda 2>&1
+          # Unlock gRPC methods needed for scanning + tx submission
+          CFG="node_data/esmeralda/config/config.toml"
+          for m in get_tip_info get_sync_progress submit_transaction get_blocks get_header_by_hash get_block_timing list_headers check_for_updates get_sync_info get_network_status get_mempool_transactions get_tokens_in_circulation get_network_difficulty get_new_block_template get_new_block; do
+            sed -i "s/#\"$m\"/\"$m\"/" "$CFG"
+          done
           echo "--- Starting node ---"
           ./tools/minotari_node --grpc-enabled --non-interactive --base-path node_data --network esmeralda > /tmp/node.log 2>&1 &
           NODE_PID=$!
