@@ -797,8 +797,14 @@ impl WalletDaemon {
     }
 
     pub(super) async fn stop(mut self) -> anyhow::Result<()> {
-        let _ = self.child.kill().await;
-        tokio::time::timeout(Duration::from_secs(10), self.child.wait()).await.ok();
+        // Kill the child and wait for it to exit, with a total timeout of 10s.
+        // tokio::process::Child::kill() sends SIGKILL and then waits internally,
+        // so we wrap the whole stop sequence.
+        let _ = tokio::time::timeout(Duration::from_secs(10), async {
+            let _ = self.child.kill().await;
+            let _ = self.child.wait().await;
+        })
+        .await;
         Ok(())
     }
 
