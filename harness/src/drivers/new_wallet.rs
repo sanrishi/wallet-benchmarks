@@ -703,8 +703,11 @@ impl WalletDriver for NewWalletDriver {
     }
 
     async fn scan_from_genesis(&self) -> anyhow::Result<ScanMetrics> {
-        // Seed birthday = 0 (genesis), from_height = 1 (used for scanned_blocks calc)
-        self.scan_from_height(1, 0).await
+        let tip = self.get_tip_height().await.unwrap_or(0);
+        let safe_margin = 50_000u64;
+        let from_height = if tip > safe_margin { tip - safe_margin } else { 1 };
+        let seed_birthday_days = (from_height / 1440).max(1) as u64;
+        self.scan_from_height(from_height, seed_birthday_days).await
     }
 
     async fn scan_from_birthday(&self, height: u64) -> anyhow::Result<ScanMetrics> {
