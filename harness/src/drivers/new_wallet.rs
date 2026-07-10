@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::process::Stdio;
 use std::str::FromStr;
 use std::sync::{Mutex, OnceLock};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use sysinfo::Pid;
 
 use anyhow::{anyhow, Context};
@@ -705,8 +705,21 @@ impl WalletDriver for NewWalletDriver {
     async fn scan_from_genesis(&self) -> anyhow::Result<ScanMetrics> {
         let tip = self.get_tip_height().await.unwrap_or(0);
         let safe_margin = 50_000u64;
+        // Calculate start block height: 50K blocks before tip
         let from_height = if tip > safe_margin { tip - safe_margin } else { 1 };
-        let seed_birthday_days = (from_height / 1440).max(1) as u64;
+        // Convert to birthday in Unix epoch days.
+        // The CIPHER seed stores birthday as days since Unix epoch (~1970).
+        // Esmeralda genesis was ~2023-07, so guesstimate birthday at block 0:
+        // we estimate genesis_day = today() - tip_minutes. Then
+        // birthday = genesis_day + from_height_minutes.
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let now_days = now / 86400;
+        // Esmeralda produces ~1 block/min, so genesis was ~tip minutes ago.
+        let genesis_day = now_days.saturating_sub(tip / 1440);
+        let seed_birthday_days = genesis_day + from_height / 1440;
         self.scan_from_height(from_height, seed_birthday_days).await
     }
 
