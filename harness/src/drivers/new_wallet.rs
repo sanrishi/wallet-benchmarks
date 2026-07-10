@@ -78,7 +78,10 @@ impl NewWalletDriver {
             base_node_grpc_url,
             confirmation_window,
             startup_timeout_secs,
-            http_client: Client::new(),
+            http_client: Client::builder()
+                .timeout(Duration::from_secs(30))
+                .build()
+                .expect("failed to build reqwest Client"),
             password,
             seed_words,
             grpc_port,
@@ -792,7 +795,7 @@ impl WalletDaemon {
 
     pub(super) async fn stop(mut self) -> anyhow::Result<()> {
         let _ = self.child.kill().await;
-        let _ = self.child.wait().await;
+        tokio::time::timeout(Duration::from_secs(10), self.child.wait()).await.ok();
         Ok(())
     }
 
