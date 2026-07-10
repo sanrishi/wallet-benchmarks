@@ -29,9 +29,19 @@ jobs:
           unzip -o /tmp/tari_suite.zip -d tools/
           chmod +x tools/minotari_*
 
-      - name: Build minotari CLI from source
+      - name: Clone minotari-cli repo
+        run: git clone --depth 1 https://github.com/tari-project/minotari-cli.git /tmp/minotari-cli
+
+      - name: Cache minotari-cli target
+        uses: actions/cache@v4
+        with:
+          path: /tmp/minotari-cli/target
+          key: minotari-cli-target-${{ runner.os }}-2026-07-10
+          restore-keys: |
+            minotari-cli-target-${{ runner.os }}-
+
+      - name: Build minotari CLI
         run: |
-          git clone --depth 1 https://github.com/tari-project/minotari-cli.git /tmp/minotari-cli
           cargo build --release --manifest-path /tmp/minotari-cli/minotari/Cargo.toml
           cp /tmp/minotari-cli/target/release/minotari tools/
           chmod +x tools/minotari
