@@ -34,6 +34,7 @@ pub struct NewWalletDriver {
     pub console_wallet_bin: PathBuf,
     pub data_dir: PathBuf,
     pub base_node_url: String,
+    base_node_grpc_url: String,
     #[allow(dead_code)]
     confirmation_window: u64,
     startup_timeout_secs: u64,
@@ -49,7 +50,8 @@ impl NewWalletDriver {
         minotari_bin: PathBuf,
         data_dir: PathBuf,
         base_node_url: String,
-    confirmation_window: u64,
+        base_node_grpc_url: String,
+        confirmation_window: u64,
         startup_timeout_secs: u64,
         password: String,
         config_seed: Option<String>,
@@ -73,6 +75,7 @@ impl NewWalletDriver {
             console_wallet_bin,
             data_dir,
             base_node_url,
+            base_node_grpc_url,
             confirmation_window,
             startup_timeout_secs,
             http_client: Client::new(),
@@ -689,7 +692,7 @@ impl WalletDriver for NewWalletDriver {
     }
 
     async fn get_tip_height(&self) -> anyhow::Result<u64> {
-        shared::get_tip_height(&self.http_client, &self.base_node_url).await
+        shared::get_tip_height(&self.http_client, &self.base_node_grpc_url).await
     }
 
     async fn get_self_address(&self) -> anyhow::Result<String> {
