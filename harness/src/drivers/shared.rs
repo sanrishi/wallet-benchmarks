@@ -123,18 +123,21 @@ pub fn derive_wallet_keys(seed_words: &str) -> anyhow::Result<(String, String)> 
     Ok((private_view_key_hex, spend_key_hex))
 }
 
-/// Query the base node for the current chain tip height via gRPC.
-pub async fn get_tip_height(_http_client: &Client, base_node_url: &str) -> anyhow::Result<u64> {
-    use crate::drivers::tari_rpc;
-    let mut client = tari_rpc::base_node_client::BaseNodeClient::connect(base_node_url.to_string())
+/// Query the base node for the current chain tip height via HTTP RPC.
+pub async fn get_tip_height(http_client: &Client, base_node_url: &str) -> anyhow::Result<u64> {
+    let url = format!("{}/get_tip_info", base_node_url.trim_end_matches('/'));
+    let resp = http_client
+        .get(&url)
+        .send()
         .await
-        .context("failed to connect to base node gRPC for get_tip_info")?;
-    let tip = client
-        .get_tip_info(tonic::Request::new(tari_rpc::Empty {}))
-        .await
-        .context("failed to call base node get_tip_info")?
-        .into_inner();
-    Ok(tip.metadata.context("get_tip_info returned no metadata")?.best_block_height)
+        .context("failed to send get_tip_info request")?;
+    let text = resp.text().await.context("failed to read get_tip_info response")?;
+    let v: serde_json::Value =
+        serde_json::from_str(&text).with_context(|| format!("failed to parse get_tip_info response: {text}"))?;
+    let height = v["metadata"]["best_block_height"]
+        .as_u64()
+        .with_context(|| format!("best_block_height not found in {text}"))?;
+    Ok(height)
 }
 
 #[cfg(test)]
