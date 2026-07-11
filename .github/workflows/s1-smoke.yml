@@ -11,7 +11,7 @@ env:
 jobs:
   s1-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
 
     steps:
       - uses: actions/checkout@v4
@@ -41,7 +41,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/minotari-cli/target
-          key: minotari-cli-target-${{ runner.os }}-2026-07-10
+          key: minotari-cli-target-${{ runner.os }}
           restore-keys: |
             minotari-cli-target-${{ runner.os }}-
 
