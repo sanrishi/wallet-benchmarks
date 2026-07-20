@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-default = []
+default = ["library_wallet"]
 library_wallet = [
     "dep:minotari_wallet",
     "dep:tari_shutdown",
