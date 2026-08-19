@@ -544,6 +544,9 @@ mod tests {
     use std::collections::VecDeque;
     use std::sync::{Arc, Mutex};
 
+    /// Number of outputs a full-history scan is expected to rediscover.
+    const REDISCOVERY_TARGET: u64 = 512;
+
     #[derive(Clone)]
     struct FakeDriver {
         mode_name: String,

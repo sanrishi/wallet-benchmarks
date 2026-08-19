@@ -17,7 +17,12 @@ use tari_common_types::seeds::{
     seed_words::SeedWords,
 };
 use tari_common_types::tari_address::{TariAddress, TariAddressFeatures};
+use tari_transaction_components::consensus::ConsensusConstantsBuilder;
 use tari_transaction_components::key_manager::wallet_types::{SeedWordsWallet, WalletType};
+use tari_transaction_components::key_manager::KeyManager;
+use tari_transaction_components::offline_signing::models::PrepareOneSidedTransactionForSigningResult;
+use tari_transaction_components::offline_signing::sign_locked_transaction;
+use tari_utilities::ByteArray;
 use tokio::process::Command;
 
 use crate::driver::WalletDriver;
@@ -26,12 +31,10 @@ use crate::drivers::shared::{
     parse_balance_output, seed_words_with_birthday,
     DEFAULT_ACCOUNT_NAME,
 };
-use crate::drivers::tari_rpc;
 use crate::metrics::{ScanMetrics, TxMetrics};
 
 pub struct NewWalletDriver {
     pub minotari_bin: PathBuf,
-    pub console_wallet_bin: PathBuf,
     pub data_dir: PathBuf,
     pub base_node_url: String,
     base_node_grpc_url: String,
@@ -41,7 +44,6 @@ pub struct NewWalletDriver {
     http_client: Client,
     password: String,
     seed_words: Mutex<String>,
-    grpc_port: Mutex<u16>,
     cached_address: OnceLock<String>,
 }
 
@@ -55,24 +57,13 @@ impl NewWalletDriver {
         startup_timeout_secs: u64,
         password: String,
         config_seed: Option<String>,
-        console_wallet_bin: PathBuf,
     ) -> anyhow::Result<Self> {
-        if !console_wallet_bin.try_exists()? {
-            anyhow::bail!(
-                "console_wallet_bin does not exist: {}",
-                console_wallet_bin.display()
-            );
-        }
-        Self::validate_console_wallet_binary(&console_wallet_bin)?;
-
         std::fs::create_dir_all(&data_dir)
             .with_context(|| format!("failed to create new_wallet data directory {}", data_dir.display()))?;
         let seed_words = Mutex::new(Self::load_or_create_seed_words(&data_dir, config_seed.as_deref())?);
-        let grpc_port = Mutex::new(Self::find_free_api_port()?);
 
         Ok(Self {
             minotari_bin,
-            console_wallet_bin,
             data_dir,
             base_node_url,
             base_node_grpc_url,
@@ -84,32 +75,8 @@ impl NewWalletDriver {
                 .expect("failed to build reqwest Client"),
             password,
             seed_words,
-            grpc_port,
             cached_address: OnceLock::new(),
         })
-    }
-
-    fn validate_console_wallet_binary(bin: &PathBuf) -> anyhow::Result<()> {
-        let output = std::process::Command::new(bin)
-            .arg("--help")
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::null())
-            .output()
-            .with_context(|| format!("failed to execute {}", bin.display()))?;
-        if !output.status.success() {
-            anyhow::bail!("{} --help failed with status {}", bin.display(), output.status);
-        }
-        let help = String::from_utf8_lossy(&output.stdout);
-        let required = ["--grpc-enabled", "--grpc-address", "--password", "--seed-words", "--base-path"];
-        let missing: Vec<&str> = required.iter().filter(|f| !help.contains(*f)).copied().collect();
-        if !missing.is_empty() {
-            anyhow::bail!(
-                "{} is missing required flags: {}. Please check the binary version (expected 5.3.1).",
-                bin.display(),
-                missing.join(", "),
-            );
-        }
-        Ok(())
     }
 
     fn database_path(&self) -> PathBuf {
@@ -217,6 +184,24 @@ impl NewWalletDriver {
         let addr_str = address.to_base58();
         let _ = self.cached_address.set(addr_str.clone());
         Ok(addr_str)
+    }
+
+    /// Reconstruct the in-process `KeyManager` from the stored seed words.
+    ///
+    /// This mirrors the daemon's `AccountRow::get_key_manager` (same
+    /// `KeyManager::new(WalletType::SeedWords(SeedWordsWallet::construct_new(cipher_seed)))`
+    /// construction), so keys derived here match the account the daemon scans
+    /// and drafts transactions for.
+    fn key_manager(&self) -> anyhow::Result<KeyManager> {
+        let mnemonic = SeedWords::from_str(&self.seed_words.lock().unwrap())
+            .context("failed to parse stored seed words for new_wallet key manager")?;
+        let cipher_seed = CipherSeed::from_mnemonic(&mnemonic, None)
+            .context("failed to reconstruct cipher seed for new_wallet key manager")?;
+        let wallet =
+            WalletType::SeedWords(SeedWordsWallet::construct_new(cipher_seed).map_err(|_| {
+                anyhow!("failed to construct seed-words wallet for new_wallet key manager")
+            })?);
+        KeyManager::new(wallet).context("failed to construct new_wallet key manager")
     }
 
     /// Find a free ephemeral port.
@@ -333,46 +318,6 @@ impl NewWalletDriver {
             .context("failed to parse minotari scan_status response")
     }
 
-    async fn get_completed_transaction(
-        &self,
-        daemon: &WalletDaemon,
-        tx_id: &str,
-    ) -> anyhow::Result<Option<CompletedTransactionResponse>> {
-        let transactions: Vec<CompletedTransactionResponse> = self
-            .http_client
-            .get(format!(
-                "{}/accounts/{}/completed_transactions?limit=1000&offset=0",
-                daemon.base_url, DEFAULT_ACCOUNT_NAME
-            ))
-            .send()
-            .await
-            .context("failed to query minotari completed_transactions API")?
-            .error_for_status()
-            .context("minotari completed_transactions API returned an HTTP error")?
-            .json()
-            .await
-            .context("failed to parse minotari completed_transactions response")?;
-        Ok(transactions
-            .into_iter()
-            .find(|transaction| Self::tx_id_matches(&transaction.id, tx_id)))
-    }
-
-    fn tx_id_matches(value: &serde_json::Value, expected: &str) -> bool {
-        if let Some(id) = value.as_u64() {
-            return expected.parse::<u64>().ok() == Some(id);
-        }
-        if let Some(id) = value.as_str() {
-            return id == expected;
-        }
-        value
-            .as_object()
-            .and_then(|object| object.values().next())
-            .and_then(|value| value.as_u64())
-            .zip(expected.parse::<u64>().ok())
-            .map(|(actual, expected)| actual == expected)
-            .unwrap_or(false)
-    }
-
     /// Core scan logic.  `from_height` controls where we consider the scan to
     /// have started; `seed_birthday_days` is a **day-count** value (not block
     /// height) used to set the CIPHER seed birthday.
@@ -463,35 +408,60 @@ impl NewWalletDriver {
         })
     }
 
-    async fn wait_for_confirmation(&self, tx_id: &str) -> anyhow::Result<f64> {
+    /// Wait for the broadcast transaction to be mined by polling the base
+    /// node's HTTP `/transactions` query endpoint, keyed by the kernel's
+    /// excess signature (nonce + signature bytes).
+    ///
+    /// The daemon does not expose a broadcast/finalize endpoint, so it will
+    /// never record our transaction in `completed_transactions`; the base node
+    /// is the authoritative source of truth for mempool/mined status.
+    async fn wait_for_confirmation(
+        &self,
+        tx_id: u64,
+        excess_sig_nonce_hex: String,
+        excess_sig_sig_hex: String,
+    ) -> anyhow::Result<f64> {
         let started_at = Instant::now();
         let deadline = started_at + Duration::from_secs(600);
-        let daemon = self.spawn_daemon(Some(1)).await?;
 
         loop {
             if Instant::now() > deadline {
-                let _ = daemon.stop().await;
-                return Err(anyhow!("transaction {tx_id} was not confirmed within 600s"));
+                return Err(anyhow!(
+                    "transaction {tx_id} was not confirmed within 600s (last status from base node)"
+                ));
             }
 
-            if let Some(transaction) = self.get_completed_transaction(&daemon, tx_id).await? {
-                match transaction.status.as_str() {
-                    "mined_confirmed" => {
-                        let elapsed = started_at.elapsed().as_secs_f64();
-                        let _ = daemon.stop().await;
-                        return Ok(elapsed);
-                    }
-                    "canceled" => {
-                        let _ = daemon.stop().await;
-                        return Err(anyhow!("transaction was canceled"));
-                    }
-                    "rejected" => {
-                        let _ = daemon.stop().await;
-                        return Err(anyhow!(transaction
-                            .last_rejected_reason
-                            .unwrap_or_else(|| "transaction was rejected".to_string())));
-                    }
-                    _ => {}
+            let url = format!(
+                "{}/transactions?excess_sig_nonce={}&excess_sig_sig={}",
+                self.base_node_url.trim_end_matches('/'),
+                excess_sig_nonce_hex,
+                excess_sig_sig_hex,
+            );
+            let response = self
+                .http_client
+                .get(&url)
+                .send()
+                .await
+                .context("failed to query base node transaction status")?
+                .error_for_status()
+                .context("base node transaction status query returned an HTTP error")?;
+            let body = response
+                .text()
+                .await
+                .context("failed to read base node transaction status response")?;
+            let status: TxQueryResponse = serde_json::from_str(&body)
+                .with_context(|| format!("failed to parse base node transaction status response: {body}"))?;
+
+            match status.location.as_str() {
+                "Mined" => return Ok(started_at.elapsed().as_secs_f64()),
+                "None" | "NotStored" => {
+                    // Not seen yet; keep polling.
+                }
+                "InMempool" => {
+                    // In the mempool; keep polling until mined.
+                }
+                other => {
+                    return Err(anyhow!("transaction {tx_id} is in unexpected state {other:?}"));
                 }
             }
 
@@ -499,154 +469,139 @@ impl NewWalletDriver {
         }
     }
 
-    fn payment_recipient(address: &str, amount: u64, fee_rate: u64) -> tari_rpc::PaymentRecipient {
-        tari_rpc::PaymentRecipient {
-            address: address.to_string(),
-            amount,
-            fee_per_gram: fee_rate,
-            payment_type: tari_rpc::payment_recipient::PaymentType::StandardMimblewimble as i32,
-            raw_payment_id: Vec::new(),
-            user_payment_id: None,
-        }
-    }
-
-    async fn grpc_transfer(
-        &self,
-        recipients: Vec<(String, u64)>,
-        fee_rate: u64,
-    ) -> anyhow::Result<(u64, Vec<u64>)> {
-        let port = *self.grpc_port.lock().unwrap();
-        let grpc_url = format!("http://127.0.0.1:{port}");
-        use tari_rpc::wallet_client::WalletClient;
-        use tari_rpc::TransferRequest;
-
-        let mut client = WalletClient::connect(grpc_url)
-            .await
-            .context("failed to connect to console wallet gRPC")?;
-        let response = client
-            .transfer(TransferRequest {
-                recipients: recipients
-                    .iter()
-                    .map(|(address, amount)| Self::payment_recipient(address, *amount, fee_rate))
-                    .collect(),
-                single_tx: true,
-            })
-            .await?
-            .into_inner();
-
-        let results = response.results;
-        let first = results
-            .first()
-            .cloned()
-            .ok_or_else(|| anyhow!("transfer returned no results"))?;
-        let failed_messages: Vec<String> = results
-            .iter()
-            .filter(|r| !r.is_success)
-            .map(|r| {
-                if r.failure_message.is_empty() {
-                    format!("recipient {} failed", r.address)
-                } else {
-                    r.failure_message.clone()
-                }
-            })
-            .collect();
-        if !failed_messages.is_empty() || !first.is_success {
-            return Err(anyhow!(failed_messages.join("; ")));
-        }
-
-        let fee = first
-            .transaction_info
-            .as_ref()
-            .map(|info| info.fee)
-            .unwrap_or(0);
-        let tx_ids: Vec<u64> = results.iter().map(|r| r.transaction_id).collect();
-        Ok((fee, tx_ids))
-    }
-
-    async fn start_wallet_for_transfer(&self) -> anyhow::Result<tokio::process::Child> {
-        let port = *self.grpc_port.lock().unwrap();
-        let seed_words = self.seed_words.lock().unwrap().clone();
-        let db_path = self.database_path();
-        let _db_str = db_path
-            .to_str()
-            .ok_or_else(|| anyhow!("database path is not valid UTF-8"))?;
-
-        let data_dir_str = self
-            .data_dir
-            .to_str()
-            .ok_or_else(|| anyhow!("data dir is not valid UTF-8"))?;
-        let mut child = Command::new(&self.console_wallet_bin)
-            .arg("--grpc-enabled")
-            .arg("--grpc-address")
-            .arg(format!("/ip4/127.0.0.1/tcp/{port}"))
-            .arg("--password")
-            .arg(&self.password)
-            .arg("--seed-words")
-            .arg(&seed_words)
-            .arg("--base-path")
-            .arg(data_dir_str)
-            .arg("--non-interactive-mode")
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| anyhow!("failed to spawn console wallet for transfer: {e}"))?;
-
-        use tari_rpc::wallet_client::WalletClient;
-        let grpc_url = format!("http://127.0.0.1:{port}");
-        let deadline = Instant::now() + Duration::from_secs(self.startup_timeout_secs);
-        loop {
-            if Instant::now() > deadline {
-                let _ = child.kill().await;
-                let _ = child.wait().await;
-                let stderr = capture_child_stderr(&mut child).await;
-                let msg = if stderr.is_empty() {
-                    format!("console wallet gRPC did not become ready within {}s", self.startup_timeout_secs)
-                } else {
-                    format!("console wallet gRPC did not become ready within {}s. stderr:\n{stderr}", self.startup_timeout_secs)
-                };
-                return Err(anyhow!(msg));
-            }
-            match child.try_wait() {
-                Ok(Some(status)) => {
-                    let stderr = capture_child_stderr(&mut child).await;
-                    let msg = if stderr.is_empty() {
-                        format!("console wallet exited early with {status}")
-                    } else {
-                        format!("console wallet exited early with {status}. stderr:\n{stderr}")
-                    };
-                    return Err(anyhow!(msg));
-                }
-                Ok(None) => {}
-                Err(e) => return Err(anyhow!("failed to check wallet status: {e}")),
-            }
-            if WalletClient::connect(grpc_url.clone()).await.is_ok() {
-                break;
-            }
-            tokio::time::sleep(Duration::from_millis(250)).await;
-        }
-        Ok(child)
-    }
-
-    async fn send_recipients(&self, recipients: Vec<(String, u64)>, fee_rate: u64) -> anyhow::Result<TxMetrics> {
+    /// Send one or more one-sided payments.
+    ///
+    /// Flow (no old wallet, no `minotari_wallet` library):
+    /// 1. Ask the `minotari daemon` REST API to scan and draft the
+    ///    transaction (`create_unsigned_transaction`). The daemon only scans
+    ///    the chain with the account's view key and selects inputs — it does
+    ///    not sign.
+    /// 2. Reconstruct the in-process `KeyManager` from the seed words and sign
+    ///    the locked payload with `tari_transaction_components`.
+    /// 3. Submit the signed transaction directly to the base node via its HTTP
+    ///    JSON-RPC endpoint.
+    /// 4. Poll the base node `/transactions` endpoint until the kernel is mined.
+    async fn send_recipients(&self, recipients: Vec<(String, u64)>, _fee_rate: u64) -> anyhow::Result<TxMetrics> {
         self.ensure_wallet_initialized().await?;
 
+        let daemon = self.spawn_daemon(Some(1)).await?;
+        let result = self.send_with_daemon(&daemon, recipients).await;
+        let _ = daemon.stop().await;
+        result
+    }
+
+    async fn send_with_daemon(
+        &self,
+        daemon: &WalletDaemon,
+        recipients: Vec<(String, u64)>,
+    ) -> anyhow::Result<TxMetrics> {
+        // 1. Draft via the daemon REST API. The daemon hardcodes its fee per
+        //    gram (DEFAULT_FEE_PER_GRAM), so the harness `fee_rate` cannot be
+        //    applied; the actual fee is read from the prepared payload.
         let construction_started = Instant::now();
-        let mut wallet = self.start_wallet_for_transfer().await?;
-        let (fee_paid, tx_ids) = self.grpc_transfer(recipients, fee_rate).await.map_err(|e| {
-            let _ = wallet.kill();
-            e
-        })?;
-        let _ = wallet.kill().await;
-        let _ = wallet.wait().await;
+        let request = serde_json::json!({
+            "recipients": recipients.iter().map(|(address, amount)| serde_json::json!({
+                "address": address,
+                "amount": amount,
+            })).collect::<Vec<_>>(),
+            "seconds_to_lock_utxos": 3600,
+        });
+        let response = self
+            .http_client
+            .post(format!(
+                "{}/accounts/{}/create_unsigned_transaction",
+                daemon.base_url,
+                DEFAULT_ACCOUNT_NAME
+            ))
+            .json(&request)
+            .send()
+            .await
+            .context("failed to call daemon create_unsigned_transaction API")?
+            .error_for_status()
+            .context("daemon create_unsigned_transaction API returned an HTTP error")?;
+        let response_body = response
+            .text()
+            .await
+            .context("failed to read daemon create_unsigned_transaction response")?;
+        let prepared: PrepareOneSidedTransactionForSigningResult = serde_json::from_str(&response_body)
+            .with_context(|| {
+                format!(
+                    "failed to parse daemon create_unsigned_transaction response: {}",
+                    &response_body[..response_body.len().min(1000)]
+                )
+            })?;
+        let tx_id: u64 = prepared.tx_id.into();
+        let fee_paid = prepared.info.fee.as_u64();
+
+        // 2. Sign in-process.
+        let key_manager = self.key_manager()?;
+        let consensus_constants = ConsensusConstantsBuilder::new(Network::Esmeralda).build();
+        let signed = sign_locked_transaction(&key_manager, consensus_constants, Network::Esmeralda, prepared)
+            .map_err(|error| anyhow!("failed to sign locked transaction: {error}"))?;
+        let transaction = signed.signed_transaction.transaction;
         let construction_secs = construction_started.elapsed().as_secs_f64();
 
-        let tx_id = tx_ids
+        // 3. Submit to the base node.
+        let kernel = transaction
+            .body()
+            .kernels()
             .first()
-            .copied()
-            .ok_or_else(|| anyhow!("transfer returned no transaction IDs"))?;
+            .ok_or_else(|| anyhow!("signed transaction has no kernel"))?;
+        let excess_sig_nonce_hex = hex::encode(kernel.excess_sig.get_compressed_public_nonce().as_bytes());
+        let excess_sig_sig_hex = hex::encode(kernel.excess_sig.get_signature().as_bytes());
 
         let broadcast_started = Instant::now();
+        let submission = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": "1",
+            "method": "submit_transaction",
+            "params": { "transaction": &transaction },
+        });
+        let submit_response = self
+            .http_client
+            .post(format!("{}/json_rpc", self.base_node_url.trim_end_matches('/')))
+            .json(&submission)
+            .send()
+            .await
+            .context("failed to submit transaction to base node")?;
+        let submit_status = submit_response.status();
+        let submit_body = submit_response
+            .text()
+            .await
+            .context("failed to read base node submit_transaction response")?;
+        if !submit_status.is_success() {
+            return Err(anyhow!(
+                "base node submit_transaction returned HTTP {submit_status}: {submit_body}"
+            ));
+        }
+        let submit_value: serde_json::Value = serde_json::from_str(&submit_body)
+            .with_context(|| format!("failed to parse submit_transaction response: {submit_body}"))?;
+        if let Some(error) = submit_value.get("error") {
+            let message = error
+                .as_str()
+                .or_else(|| error.get("message").and_then(|message| message.as_str()))
+                .unwrap_or("unknown JSON-RPC error");
+            return Err(anyhow!("base node rejected transaction {tx_id}: {message}"));
+        }
+        let accepted = submit_value
+            .get("result")
+            .and_then(|result| result.get("accepted"))
+            .and_then(|accepted| accepted.as_bool())
+            .ok_or_else(|| anyhow!("submit_transaction response missing result.accepted: {submit_body}"))?;
+        if !accepted {
+            let reason = submit_value
+                .get("result")
+                .and_then(|result| result.get("rejection_reason"))
+                .and_then(|reason| reason.as_str())
+                .unwrap_or("unknown");
+            return Err(anyhow!("transaction {tx_id} was rejected by the network: {reason}"));
+        }
         let broadcast_to_mempool_secs = broadcast_started.elapsed().as_secs_f64();
-        let broadcast_to_confirmed_secs = self.wait_for_confirmation(&tx_id.to_string()).await?;
+
+        // 4. Wait for the kernel to be mined.
+        let broadcast_to_confirmed_secs =
+            self.wait_for_confirmation(tx_id, excess_sig_nonce_hex, excess_sig_sig_hex)
+                .await?;
 
         Ok(TxMetrics {
             tx_id: tx_id.to_string(),
@@ -779,11 +734,17 @@ struct ScanStatusResponse {
     outputs_found: u64,
 }
 
+/// Base node `/transactions` query response.
 #[derive(Debug, Deserialize)]
-struct CompletedTransactionResponse {
-    id: serde_json::Value,
-    status: String,
-    last_rejected_reason: Option<String>,
+struct TxQueryResponse {
+    /// One of "None", "NotStored", "InMempool" or "Mined".
+    location: String,
+    #[allow(dead_code)]
+    mined_height: Option<u64>,
+    #[allow(dead_code)]
+    mined_header_hash: Option<String>,
+    #[allow(dead_code)]
+    mined_timestamp: Option<String>,
 }
 
 pub(super) struct WalletDaemon {
@@ -819,16 +780,5 @@ impl WalletDaemon {
     pub(super) fn kill_sync(&mut self) {
         let _ = self.child.kill();
         let _ = self.child.wait();
-    }
-}
-
-async fn capture_child_stderr(child: &mut tokio::process::Child) -> String {
-    use tokio::io::AsyncReadExt;
-    if let Some(ref mut stderr) = child.stderr {
-        let mut buf = String::new();
-        let _ = stderr.read_to_string(&mut buf).await;
-        buf
-    } else {
-        String::new()
     }
 }

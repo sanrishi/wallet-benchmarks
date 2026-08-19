@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use anyhow::Context;
 use config::Config;
 use driver::WalletDriver;
-use drivers::library_wallet::LibraryWalletDriver;
+use drivers::new_wallet::NewWalletDriver;
 use drivers::old_wallet::OldWalletDriver;
 use drivers::payment_processor::PaymentProcessorDriver;
 use metrics::{BenchmarkReport, ScenarioResult};
@@ -129,18 +129,17 @@ async fn print_all_wallet_addresses(config: &Config) -> anyhow::Result<()> {
     old_wallet.stop();
     println!("old_wallet: {}", old_wallet_result?);
 
-    {
-        let library_wallet = LibraryWalletDriver::new(
-            require_nonempty_path("minotari_bin", &config.paths.minotari_bin)?,
-            require_nonempty_path("new_wallet", &config.data.new_wallet)?,
-            config.network.base_node_http_url.clone(),
-            config.benchmark.c_min,
-            config.benchmark.startup_timeout_secs,
-            config.passwords.library_wallet.clone(),
-            config_seed_for(config, "library_wallet"),
-        )?;
-        println!("library_wallet: {}", library_wallet.get_self_address().await?);
-    }
+    let new_wallet = NewWalletDriver::new(
+        require_nonempty_path("minotari_bin", &config.paths.minotari_bin)?,
+        require_nonempty_path("new_wallet", &config.data.new_wallet)?,
+        config.network.base_node_http_url.clone(),
+        config.network.base_node_grpc_url.clone(),
+        config.benchmark.c_min,
+        config.benchmark.startup_timeout_secs,
+        config.passwords.new_wallet.clone(),
+        config_seed_for(config, "new_wallet"),
+    )?;
+    println!("new_wallet: {}", new_wallet.get_self_address().await?);
 
     let payment_processor = PaymentProcessorDriver::new(
         require_nonempty_path(
@@ -180,7 +179,6 @@ fn config_seed_for(config: &Config, mode: &str) -> Option<String> {
         "old_wallet" => s.old_wallet.clone(),
         "new_wallet" => s.new_wallet.clone(),
         "payment_processor" => s.payment_processor.clone(),
-        "library_wallet" => s.library_wallet.clone(),
         _ => None,
     })
 }
@@ -273,24 +271,25 @@ fn build_report(
 }
 
 async fn run_new_wallet(config: &Config) -> (String, Vec<ScenarioResult>) {
-    let library_wallet = (|| -> anyhow::Result<LibraryWalletDriver> {
-        Ok(LibraryWalletDriver::new(
+    let new_wallet = (|| -> anyhow::Result<NewWalletDriver> {
+        Ok(NewWalletDriver::new(
             require_nonempty_path("minotari_bin", &config.paths.minotari_bin)?,
             require_nonempty_path("new_wallet", &config.data.new_wallet)?,
             config.network.base_node_http_url.clone(),
+            config.network.base_node_grpc_url.clone(),
             config.benchmark.c_min,
             config.benchmark.startup_timeout_secs,
-            config.passwords.library_wallet.clone(),
-            config_seed_for(config, "library_wallet"),
+            config.passwords.new_wallet.clone(),
+            config_seed_for(config, "new_wallet"),
         )?)
     })();
-    match library_wallet {
-        Ok(library_wallet) => {
-            if let Ok(addr) = library_wallet.get_self_address().await {
-                println!("new_wallet (library) address: {addr}");
+    match new_wallet {
+        Ok(new_wallet) => {
+            if let Ok(addr) = new_wallet.get_self_address().await {
+                println!("new_wallet address: {addr}");
             }
-            let mode_name = library_wallet.mode_name().to_string();
-            let scenarios = match run_all_scenarios(&library_wallet, config).await {
+            let mode_name = new_wallet.mode_name().to_string();
+            let scenarios = match run_all_scenarios(&new_wallet, config).await {
                 Ok(scenarios) => scenarios,
                 Err(error) => {
                     eprintln!("new_wallet scenarios failed: {error}");
@@ -307,38 +306,37 @@ async fn run_new_wallet(config: &Config) -> (String, Vec<ScenarioResult>) {
 }
 
 async fn run_single_scenario(config: &Config, name: &str) -> anyhow::Result<()> {
-    let library_wallet = LibraryWalletDriver::new(
+    let new_wallet = NewWalletDriver::new(
         require_nonempty_path("minotari_bin", &config.paths.minotari_bin)?,
         require_nonempty_path("new_wallet", &config.data.new_wallet)?,
         config.network.base_node_http_url.clone(),
+        config.network.base_node_grpc_url.clone(),
         config.benchmark.c_min,
         config.benchmark.startup_timeout_secs,
-        config.passwords.library_wallet.clone(),
-        config_seed_for(config, "library_wallet"),
+        config.passwords.new_wallet.clone(),
+        config_seed_for(config, "new_wallet"),
     )?;
-    if let Ok(addr) = library_wallet.get_self_address().await {
-        println!("library_wallet address: {addr}");
+    if let Ok(addr) = new_wallet.get_self_address().await {
+        println!("new_wallet address: {addr}");
     }
 
     println!("Running B0 (scan)...");
-    let _b0 = run_b0(&library_wallet).await.map_err(|e| {
+    let _b0 = run_b0(&new_wallet).await.map_err(|e| {
         eprintln!("B0 failed: {e}");
         e
     })?;
 
     let result = match name {
-        "S0" => run_s0(&library_wallet, config).await?,
-        "S1" => run_s1(&library_wallet, config).await?,
-        "S4" => run_s4(&library_wallet, config).await?,
-        "S5" => run_s5(&library_wallet, config).await?,
+        "S0" => run_s0(&new_wallet, config).await?,
+        "S1" => run_s1(&new_wallet, config).await?,
+        "S4" => run_s4(&new_wallet, config).await?,
+        "S5" => run_s5(&new_wallet, config).await?,
         other => anyhow::bail!("unsupported single scenario: {other} (use S0, S1, S4, or S5)"),
     };
 
     println!("{} result: {}", name, serde_json::to_string_pretty(&result)?);
     Ok(())
 }
-
-
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

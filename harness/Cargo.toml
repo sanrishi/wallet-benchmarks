@@ -3,16 +3,6 @@ name = "harness"
 version = "0.1.0"
 edition = "2021"
 
-[features]
-default = ["library_wallet"]
-library_wallet = [
-    "dep:minotari_wallet",
-    "dep:tari_shutdown",
-    "dep:tari_comms",
-    "dep:tari_p2p",
-    "dep:url",
-]
-
 [dependencies]
 tokio = { version = "=1.48.0", features = ["full"] }
 serde = { version = "=1.0.228", features = ["derive"] }
@@ -28,15 +18,11 @@ chrono = "=0.4.42"
 async-trait = "=0.1.89"
 anyhow = "=1.0.100"
 futures = "=0.3.30"
-tari_common = "=5.3.1"
-tari_common_types = "=5.3.1"
-tari_transaction_components = "=5.3.1"
+tari_common = "=5.6.0-pre.1"
+tari_common_types = "=5.6.0-pre.1"
+tari_transaction_components = "=5.6.0-pre.1"
 tempfile = "=3.27.0"
-minotari_wallet = { version = "=5.3.1", optional = true, default-features = true }
-tari_shutdown = { version = "=5.3.1", optional = true }
-tari_comms = { version = "=5.3.1", optional = true }
-tari_p2p = { version = "=5.3.1", optional = true }
-url = { version = "2", optional = true }
+hex = "=0.4.3"
 
 [dev-dependencies]
 pretty_assertions = "1"
